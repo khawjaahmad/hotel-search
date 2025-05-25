@@ -126,8 +126,6 @@ windows/Runner.exe.config
 
 # Test and coverage
 coverage/
-test/
-integration_test/
 screenshots/
 allure/
 allure-report/

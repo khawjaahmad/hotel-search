@@ -49,8 +49,7 @@ class PatrolTestHelper {
       await $.pumpUntilFound(finder, timeout: timeout);
       debugPrint('✅ Widget found: ${description ?? finder.toString()}');
     } catch (e) {
-      debugPrint(
-          '❌ Widget not found: ${description ?? finder.toString()} - $e');
+      debugPrint('❌ Widget not found: ${description ?? finder.toString()} - $e');
       rethrow;
     }
   }
@@ -60,12 +59,17 @@ class PatrolTestHelper {
     PatrolIntegrationTester $,
     String key, {
     String? description,
+    Duration? settleTimeout,
   }) async {
     try {
       final finder = find.byKey(Key(key));
       await waitForWidget($, finder, description: description ?? 'Key: $key');
       await $(Key(key)).tap();
-      await $.pumpAndSettle();
+      if (settleTimeout != null) {
+        await $.pump(settleTimeout);
+      } else {
+        await $.pumpAndSettle();
+      }
       debugPrint('✅ Tapped: ${description ?? key}');
     } catch (e) {
       debugPrint('❌ Failed to tap: ${description ?? key} - $e');
@@ -79,16 +83,36 @@ class PatrolTestHelper {
     String key,
     String text, {
     String? description,
+    Duration? settleTimeout,
   }) async {
     try {
       final finder = find.byKey(Key(key));
-      await waitForWidget($, finder,
-          description: description ?? 'Text field: $key');
+      await waitForWidget($, finder, description: description ?? 'Text field: $key');
       await $(Key(key)).enterText(text);
-      await $.pumpAndSettle();
+      if (settleTimeout != null) {
+        await $.pump(settleTimeout);
+      } else {
+        await $.pumpAndSettle();
+      }
       debugPrint('✅ Entered text "$text" in: ${description ?? key}');
     } catch (e) {
       debugPrint('❌ Failed to enter text in: ${description ?? key} - $e');
+      rethrow;
+    }
+  }
+
+  /// Clear text from a field
+  static Future<void> clearTextByKey(
+    PatrolIntegrationTester $,
+    String key, {
+    String? description,
+  }) async {
+    try {
+      await $(Key(key)).enterText('');
+      await $.pumpAndSettle();
+      debugPrint('✅ Cleared text in: ${description ?? key}');
+    } catch (e) {
+      debugPrint('❌ Failed to clear text in: ${description ?? key} - $e');
       rethrow;
     }
   }
@@ -135,7 +159,7 @@ class PatrolTestHelper {
   }
 
   /// Widget visibility check
-  static bool isWidgetVisible(String key) {
+  static bool isWidgetVisible(String key, {String? description}) {
     final isVisible = find.byKey(Key(key)).evaluate().isNotEmpty;
     return isVisible;
   }
@@ -147,6 +171,17 @@ class PatrolTestHelper {
       debugPrint('✅ Widget verified: ${description ?? key}');
     } catch (e) {
       debugPrint('❌ Widget missing: ${description ?? key}');
+      rethrow;
+    }
+  }
+
+  /// Verify widget does not exist
+  static void verifyWidgetNotExists(String key, {String? description}) {
+    try {
+      expect(find.byKey(Key(key)), findsNothing);
+      debugPrint('✅ Widget correctly absent: ${description ?? key}');
+    } catch (e) {
+      debugPrint('❌ Widget should not exist: ${description ?? key}');
       rethrow;
     }
   }
@@ -175,10 +210,19 @@ class PatrolTestHelper {
       return result;
     } catch (e) {
       stopwatch.stop();
-      debugPrint(
-          '❌ $operationName failed after: ${stopwatch.elapsedMilliseconds}ms');
+      debugPrint('❌ $operationName failed after: ${stopwatch.elapsedMilliseconds}ms');
       rethrow;
     }
+  }
+
+  /// Wait for widget to disappear
+  static Future<void> waitForWidgetToDisappear(
+    PatrolIntegrationTester $,
+    Finder finder, {
+    Duration timeout = defaultTimeout,
+    String? description,
+  }) async {
+    await _waitForWidgetToDisappear($, finder, timeout: timeout);
   }
 
   /// Private helper for widget disappearance
@@ -194,50 +238,14 @@ class PatrolTestHelper {
     }
   }
 
-  /// Reset initialization state (for testing)
-  static void resetAppInitialization() {
-    _isAppInitialized = false;
-    debugPrint('🔄 App initialization state reset');
-  }
-
-  static Future<void> clearTextByKey(PatrolIntegrationTester $, String key, {String? description}) async {
-    await $(find.byKey(Key(key))).enterText('');
-  }
-
-  static void verifyWidgetNotExists(String key, {String? description}) {
-    expect(find.byKey(Key(key)), findsNothing);
-  }
-
+  /// Verify multiple widgets exist
   static void verifyMultipleWidgetsExist(List<String> keys) {
     for (final key in keys) {
       expect(find.byKey(Key(key)), findsOneWidget);
     }
   }
 
-  static Future<void> waitForWidgetToDisappear(
-    PatrolIntegrationTester $,
-    Finder finder, {
-    Duration timeout = const Duration(seconds: 10),
-    String? description,
-  }) async {
-    bool isFound = true;
-    final stopwatch = Stopwatch()..start();
-
-    while (isFound && stopwatch.elapsed < timeout) {
-      await $.pump(const Duration(milliseconds: 100));
-      try {
-        await $(finder).waitUntilVisible();
-        isFound = true;
-      } catch (e) {
-        isFound = false;
-      }
-    }
-
-    if (isFound) {
-      throw Exception('Widget ${description ?? finder.toString()} did not disappear within $timeout');
-    }
-  }
-
+  /// Wait for multiple widgets
   static Future<void> waitForMultipleWidgets(
     PatrolIntegrationTester $,
     List<String> keys, {
@@ -248,30 +256,30 @@ class PatrolTestHelper {
     }
   }
 
+  /// Scroll until visible - Fixed implementation
   static Future<void> scrollUntilVisible(
     PatrolIntegrationTester $,
     String scrollableKey,
     String targetKey, {
-    double delta = 100,
     int maxScrolls = 10,
-    String? description,
   }) async {
     final scrollable = find.byKey(Key(scrollableKey));
     final target = find.byKey(Key(targetKey));
     
-    for (int i = 0; i < maxScrolls; i++) {
-      if (await isWidgetVisible(targetKey)) {
-        return;
-      }
-      
-      // Use drag instead of scroll
-      await $(scrollable).dragTo(
-        dy: -delta, // Negative for upward scroll
-        duration: const Duration(milliseconds: 300),
-      );
-      await $.pump(const Duration(milliseconds: 300));
+    if (target.evaluate().isNotEmpty) {
+      return;
     }
     
-    throw Exception('Could not make target element visible after $maxScrolls scrolls');
+    await $(scrollable).scrollUntilVisible(
+      target,
+      maxScrolls: maxScrolls,
+      timeout: defaultTimeout,
+    );
+  }
+
+  /// Reset initialization state (for testing)
+  static void resetAppInitialization() {
+    _isAppInitialized = false;
+    debugPrint('🔄 App initialization state reset');
   }
 }
