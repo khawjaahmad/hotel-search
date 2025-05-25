@@ -1,0 +1,22 @@
+{
+  "overview": {
+    "title": "Hotel Booking",
+    "label": "Overview"
+  },
+  "hotels": {
+    "search": "Search Hotels",
+    "label": "Hotels",
+    "error": {
+      "message": "Something went wrong",
+      "retry": "Try Again"
+    }
+  },
+  "favorites": {
+    "title": "Your Favorite Hotels",
+    "label": "Favorites"
+  },
+  "account": {
+    "title": "Your Account",
+    "label": "Account"
+  }
+}
