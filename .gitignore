@@ -3,6 +3,9 @@
 *.log
 *.pyc
 *.swp
+*.tmp
+*.bak
+*~
 .DS_Store
 .atom/
 .build/
@@ -11,6 +14,9 @@
 .svn/
 .swiftpm/
 migrate_working_dir/
+.env
+.env.*
+.metadata
 
 # IntelliJ related
 *.iml
@@ -26,69 +32,117 @@ migrate_working_dir/
 !.vscode/extensions.json
 
 # Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
 .packages
 .pub-cache/
 .pub/
-/build/
+build/
 *.lock
 !/pubspec.lock
-
-# Web related
+**/doc/api/
 lib/generated_plugin_registrant.dart
+lib/env.g.dart
+*.g.dart
+*.freezed.dart
+*.gen.dart
+*.gr.dart
+*.part
+*.pb.dart
+*.pbenum.dart
+*.pbserver.dart
+*.pbjson.dart
+flutter_*.png
+flutter_*.snapshot
+flutter_export_environment.sh
+service-worker.js
+.analysis_options.yaml
+.dart_test.yaml
+.devtools_options.yaml
+
+# Android related
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+android/*.iml
+android/gradlew
+android/gradlew.bat
+android/**/gradle-wrapper.jar
+android/captures/
+android/**/GeneratedPluginRegistrant.java
+android/key.properties
 
 # iOS/XCode related
-**/ios/**/*.mode1v3
-**/ios/**/*.mode2v3
-**/ios/**/*.moved-aside
-**/ios/**/*.pbxuser
-**/ios/**/*.perspectivev3
-**/ios/**/*sync/
-**/ios/**/.sconsign.dblite
-**/ios/**/.tags*
-**/ios/**/.vagrant/
-**/ios/**/DerivedData/
-**/ios/**/Icon?
-**/ios/**/Pods/
-**/ios/**/.symlinks/
-**/ios/**/profile
-**/ios/**/xcuserdata
-**/ios/.generated/
-**/ios/Flutter/.last_build_id
-**/ios/Flutter/ephemeral
-**/ios/Flutter/Generated.xcconfig
-**/ios/Flutter/flutter_export_environment.sh
+ios/.build/
+ios/Pods/
+ios/Podfile.lock
+ios/Runner.xcworkspace/
+ios/Runner.xcodeproj/project.xcworkspace/
+ios/Runner.xcodeproj/xcshareddata/
+ios/.xcconfig
+ios/Flutter/flutter_export_environment.sh
+ios/Flutter/Debug.xcconfig
+ios/Flutter/Release.xcconfig
+ios/Flutter/.last_build_id
+ios/Flutter/ephemeral
+ios/Flutter/Generated.xcconfig
 ios/Flutter/Flutter.framework
 ios/Flutter/Flutter.podspec
 ios/ServiceDefinitions.json
-ios/Runner.xcworkspace/
-ios/Runner.xcodeproj/project.xcworkspace
+ios/.generated/
+ios/**/*.mode1v3
+ios/**/*.mode2v3
+ios/**/*.moved-aside
+ios/**/*.pbxuser
+ios/**/*.perspectivev3
+ios/**/*sync/
+ios/**/.sconsign.dblite
+ios/**/.tags*
+ios/**/.vagrant/
+ios/**/DerivedData/
+ios/**/Icon?
+ios/**/.symlinks/
+ios/**/profile
+ios/**/xcuserdata
 
-# Android related
-**/android/**/gradle-wrapper.jar
-**/android/.gradle
-**/android/captures/
-**/android/gradlew
-**/android/gradlew.bat
-**/android/local.properties
-**/android/**/GeneratedPluginRegistrant.java
-**/android/key.properties
-android/app/build/
+# macOS related
+macos/.DS_Store
+macos/Flutter/ephemeral/
+macos/Flutter/Flutter-Generated.xcconfig
+macos/Runner.xcworkspace/
+macos/Runner.xcodeproj/project.xcworkspace/
+macos/Runner.xcodeproj/xcshareddata/
 
-# Coverage
+# Linux related
+linux/build/
+
+# Windows related
+windows/build/
+windows/Runner.exe
+windows/Runner.exe.config
+
+# Test and coverage
 coverage/
+test/
+integration_test/
+screenshots/
+allure/
+allure-report/
+allure-results/
 
-# Symbolication related
+# Symbolication and obfuscation
 app.*.symbols
-
-# Obfuscation related
 app.*.map.json
 
-# Environment files
-.env
-.env.*
-lib/env.g.dart
+# Node.js related
+node_modules/
+package-lock.json
+package.json
+
+# Other project-specific files
+Makefile
+README.md
+testing-strategy.md
