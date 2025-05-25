@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:patrol/patrol.dart';
 import 'base_page.dart';
-import '../locators/app_locators.dart';
+import '../locators/hotel_locators.dart';
 import '../helpers/search_error_handler.dart';
+import '../helpers/enhanced_search_handler.dart';
 
-/// Hotels Page Object Model
-/// Handles hotel search, listing, favorites, and pagination operations
-/// Follows best practices for maintainable and reliable test automation
+/// Hotels Page Object Model - Enhanced Integration Testing Focus
+/// Handles comprehensive hotel search, listing, favorites, and pagination operations
+/// Utilizes new HotelsLocators and enhanced base functionality
+/// Optimized for critical integration test scenarios
 class HotelsPage extends BasePage {
   HotelsPage(PatrolIntegrationTester $) : super($);
 
@@ -15,118 +17,237 @@ class HotelsPage extends BasePage {
   String get pageName => 'hotels';
 
   @override
-  String get pageKey => AppLocators.hotelsScaffold;
+  String get pageKey => HotelsLocators.scaffold;
 
   // =============================================================================
-  // BASIC VERIFICATION METHODS
+  // ENHANCED PAGE VERIFICATION METHODS
   // =============================================================================
 
-  /// Verify that the hotels page is fully loaded and ready for interaction
+  /// Comprehensive hotels page verification with new locator system
   Future<void> verifyHotelsPageLoaded() async {
-    logAction('Verifying hotels page is loaded');
+    logAction('Verifying hotels page with comprehensive checks');
+
     await verifyPageIsLoaded();
-    await _verifyHotelsPageElements();
+    await _verifyEssentialPageElements();
+    await _verifySearchFunctionality();
+
+    logSuccess('Hotels page fully loaded and verified');
   }
 
-  /// Verify all essential page elements are present
-  Future<void> _verifyHotelsPageElements() async {
-    logAction('Verifying hotels page elements');
-    verifyElementExists(AppLocators.hotelsAppBar);
-    verifyElementExists(AppLocators.hotelsSearchField);
-    _verifySearchFieldComponents();
-  }
+  /// Verify all critical page elements using HotelsLocators
+  Future<void> _verifyEssentialPageElements() async {
+    logAction('Verifying essential hotels page elements');
 
-  /// Verify search field and its components are functional
-  void _verifySearchFieldComponents() {
-    logAction('Verifying search field components');
+    try {
+      // Validate page structure using HotelsLocators
+      HotelsLocators.validatePageStructure();
 
-    // Verify TextField exists within the search field container
-    final textField = find.byType(TextField);
-    expect(textField, findsOneWidget,
-        reason: 'TextField should be present in search field');
+      // Verify search elements
+      HotelsLocators.validateSearchElements();
 
-    // Verify search icon exists
-    final searchIcon = find.byIcon(Icons.search);
-    expect(searchIcon, findsOneWidget, reason: 'Search icon should be visible');
-
-    // Verify clear button exists
-    final clearButton = find.byIcon(Icons.cancel_outlined);
-    expect(clearButton, findsOneWidget,
-        reason: 'Clear button should be accessible');
-  }
-
-  /// Check if search field is visible and functional
-  void verifySearchFieldVisible() {
-    logAction('Verifying search field visibility and functionality');
-    verifyElementExists(AppLocators.hotelsSearchField);
-    _verifySearchFieldComponents();
-  }
-
-  // =============================================================================
-  // SEARCH OPERATIONS
-  // =============================================================================
-
-  /// Perform hotel search with the given query
-  /// @param query - The search term to enter
-  Future<void> searchHotels(String query) async {
-    logAction('Searching for hotels with query: "$query"');
-
-    await _prepareSearchField();
-    await _enterSearchQuery(query);
-    await _waitForSearchToProcess();
-
-    await takePageScreenshot('search_completed_$query');
-  }
-
-  /// Prepare search field for input by clearing any existing content
-  Future<void> _prepareSearchField() async {
-    await waitForElement(AppLocators.hotelsSearchField);
-    await _clearSearchFieldIfNeeded();
-  }
-
-  /// Enter the search query into the text field
-  Future<void> _enterSearchQuery(String query) async {
-    final textField = find.byType(TextField);
-    if (textField.evaluate().isNotEmpty) {
-      await $(textField.first).enterText(query);
-      await $.pump(const Duration(milliseconds: 600)); // Wait for debounce
-      logAction('Successfully entered search query: "$query"');
-    } else {
-      throw Exception('TextField not found in search field container');
+      logSuccess('All essential page elements verified');
+    } catch (e) {
+      logError('Essential page elements verification failed', e);
+      await takeErrorScreenshot('essential_elements_failed');
+      rethrow;
     }
   }
 
-  /// Wait for search processing to complete
-  Future<void> _waitForSearchToProcess() async {
-    await waitForLoadingToComplete();
-    await $.pump(const Duration(milliseconds: 300)); // Additional stabilization
+  /// Verify search functionality is ready
+  Future<void> _verifySearchFunctionality() async {
+    logAction('Verifying search functionality readiness');
+
+    try {
+      // Use smart finder from HotelsLocators
+      final searchField = HotelsLocators.searchFieldFinder;
+      expect(searchField, findsOneWidget,
+          reason: 'Search field should be accessible');
+
+      // Verify search icons and components
+      expect(find.byIcon(Icons.search), findsOneWidget,
+          reason: 'Search icon should be visible');
+      expect(find.byIcon(Icons.cancel_outlined), findsOneWidget,
+          reason: 'Clear button should be accessible');
+
+      logSuccess('Search functionality verified');
+    } catch (e) {
+      logError('Search functionality verification failed', e);
+      rethrow;
+    }
   }
 
-  /// Clear search field using the clear button or fallback method
+  /// Quick verification for search field visibility
+  void verifySearchFieldVisible() {
+    logAction('Quick verification of search field visibility');
+
+    try {
+      final searchField = HotelsLocators.searchFieldFinder;
+      expect(searchField, findsOneWidget,
+          reason: 'Search field should be visible');
+      logSuccess('Search field is visible and accessible');
+    } catch (e) {
+      logError('Search field visibility check failed', e);
+      rethrow;
+    }
+  }
+
+  // =============================================================================
+  // ENHANCED SEARCH OPERATIONS
+  // =============================================================================
+
+  /// Professional search operation with comprehensive error handling
+  Future<void> searchHotels(String query) async {
+    logAction('Executing hotel search with query: "$query"');
+
+    try {
+      await _prepareSearchEnvironment();
+      await _executeSearchQuery(query);
+      await _waitForSearchCompletion();
+
+      await takePageScreenshot('search_executed_${query.replaceAll(' ', '_')}');
+      logSuccess('Hotel search completed for: "$query"');
+    } catch (e) {
+      logError('Hotel search failed for query: "$query"', e);
+      await takeErrorScreenshot('search_failed_${query.replaceAll(' ', '_')}');
+      rethrow;
+    }
+  }
+
+  /// Prepare search environment for optimal execution
+  Future<void> _prepareSearchEnvironment() async {
+    logAction('Preparing search environment');
+
+    // Ensure search field is ready
+    await waitForElement(HotelsLocators.searchField,
+        description: 'Search field container');
+
+    // Clear any existing search if needed
+    await _clearSearchIfNeeded();
+
+    // Wait for page stability
+    await waitForPageStabilization();
+  }
+
+  /// Execute the actual search query
+  Future<void> _executeSearchQuery(String query) async {
+    logAction('Executing search query: "$query"');
+
+    try {
+      // Use TextField directly for reliable text entry
+      final textField = find.byType(TextField);
+      if (textField.evaluate().isNotEmpty) {
+        await $(textField.first).enterText(query);
+        await $
+            .pump(const Duration(milliseconds: 800)); // Extended debounce wait
+        logSuccess('Search query entered successfully');
+      } else {
+        throw Exception('TextField not accessible for search query entry');
+      }
+    } catch (e) {
+      logError('Failed to execute search query', e);
+      rethrow;
+    }
+  }
+
+  /// Wait for search completion with intelligent state detection
+  Future<void> _waitForSearchCompletion() async {
+    logAction('Waiting for search completion');
+
+    await waitForLoadingToComplete();
+    await $.pump(const Duration(milliseconds: 500)); // Additional stabilization
+
+    logSuccess('Search completion wait finished');
+  }
+
+  /// Enhanced search with comprehensive result handling
+  Future<SearchExecutionResult> performSearchTest(String query) async {
+    logAction('Performing comprehensive search test for: "$query"');
+
+    final startTime = DateTime.now();
+
+    try {
+      // Execute search
+      await searchHotels(query);
+
+      // Wait for results with enhanced handler
+      final searchState =
+          await EnhancedSearchHandler.handleSearchWithTimeout($, query);
+
+      final endTime = DateTime.now();
+      final duration = endTime.difference(startTime);
+
+      // Analyze results
+      final result = SearchExecutionResult(
+        query: query,
+        state: searchState,
+        duration: duration,
+        resultCount: _getCurrentResultCount(),
+        wasSuccessful: searchState.isTerminal,
+      );
+
+      // Validate results if found
+      if (searchState == SearchResultState.hasResults) {
+        await EnhancedSearchHandler.validateSearchResults($);
+        result.quality = await _analyzeSearchQuality();
+      }
+
+      logSuccess('Search test completed: ${result.toString()}');
+      return result;
+    } catch (e) {
+      final endTime = DateTime.now();
+      logError('Search test failed for: "$query"', e);
+
+      return SearchExecutionResult(
+        query: query,
+        state: SearchResultState.error,
+        duration: endTime.difference(startTime),
+        resultCount: 0,
+        wasSuccessful: false,
+        error: e.toString(),
+      );
+    }
+  }
+
+  /// Clear search field with multiple strategies
   Future<void> clearSearchField() async {
     logAction('Clearing search field');
 
-    if (await _tryClearWithButton()) {
-      await $.pump(const Duration(milliseconds: 300));
-      logAction('Search field cleared using clear button');
-    } else {
-      await _clearWithFallbackMethod();
-      logAction('Search field cleared using fallback method');
+    try {
+      // Strategy 1: Use clear button
+      if (await _tryClearWithButton()) {
+        logSuccess('Search cleared using clear button');
+        return;
+      }
+
+      // Strategy 2: Clear via text entry
+      await _clearWithTextEntry();
+      logSuccess('Search cleared using text entry');
+    } catch (e) {
+      logError('Failed to clear search field', e);
+      rethrow;
     }
   }
 
-  /// Attempt to clear using the cancel button
+  /// Clear search if content is present
+  Future<void> _clearSearchIfNeeded() async {
+    // Always attempt to clear for clean state
+    await _tryClearWithButton();
+    await $.pump(const Duration(milliseconds: 300));
+  }
+
+  /// Attempt clear using cancel button
   Future<bool> _tryClearWithButton() async {
     final clearButton = find.byIcon(Icons.cancel_outlined);
     if (clearButton.evaluate().isNotEmpty) {
       await $(clearButton.first).tap();
+      await $.pump(const Duration(milliseconds: 300));
       return true;
     }
     return false;
   }
 
-  /// Fallback method to clear by entering empty text
-  Future<void> _clearWithFallbackMethod() async {
+  /// Clear via text entry method
+  Future<void> _clearWithTextEntry() async {
     final textField = find.byType(TextField);
     if (textField.evaluate().isNotEmpty) {
       await $(textField.first).enterText('');
@@ -134,20 +255,26 @@ class HotelsPage extends BasePage {
     }
   }
 
-  /// Clear search field only if it contains text
-  Future<void> _clearSearchFieldIfNeeded() async {
-    // This is a simplified approach - in a real scenario, you might want to
-    // check if the field actually contains text before clearing
-    await _tryClearWithButton();
+  // =============================================================================
+  // SEARCH RESULTS ANALYSIS WITH ENHANCED HANDLERS
+  // =============================================================================
+
+  /// Get current result count using HotelsLocators
+  int _getCurrentResultCount() {
+    return HotelsLocators.getHotelCardCount();
   }
 
-  // =============================================================================
-  // SEARCH RESULTS HANDLING
-  // =============================================================================
+  /// Check if search has results
+  bool hasSearchResults() {
+    final hasResults = HotelsLocators.hasResults;
+    logAction(
+        'Search results check: $hasResults (${_getCurrentResultCount()} cards)');
+    return hasResults;
+  }
 
-  /// Wait for search results to load with comprehensive error handling
+  /// Wait for search results with enhanced error handling
   Future<void> waitForSearchResults() async {
-    logAction('Waiting for search results with error handling');
+    logAction('Waiting for search results with enhanced error handling');
 
     await SearchErrorHandler.handleSearchResult($, () async {
       await _performSearchResultsWait();
@@ -160,412 +287,476 @@ class HotelsPage extends BasePage {
     await $.pump(const Duration(milliseconds: 500));
 
     // Wait for loading indicator to disappear if present
-    if (isElementVisible(AppLocators.hotelsLoadingIndicator)) {
-      await waitForElementToDisappear(AppLocators.hotelsLoadingIndicator);
+    if (isElementVisible(HotelsLocators.loadingIndicator)) {
+      await waitForElementToDisappear(HotelsLocators.loadingIndicator);
     }
 
     await waitForLoadingToComplete();
     logAction('Search results wait completed');
   }
 
-  /// Check if search has returned actual results
-  bool hasSearchResults() {
-    final hotelCards = find.byType(Card);
-    final hasResults = hotelCards.evaluate().isNotEmpty;
-    logAction(
-        'Search results check: $hasResults (${hotelCards.evaluate().length} cards found)');
-    return hasResults;
-  }
+  /// Comprehensive search quality analysis
+  Future<SearchQualityMetrics> _analyzeSearchQuality() async {
+    logAction('Analyzing search result quality');
 
-  /// Count the number of hotel cards currently displayed
-  int countHotelCards() {
-    final hotelCards = find.byType(Card);
-    final count = hotelCards.evaluate().length;
-    logAction('Current hotel cards count: $count');
-    return count;
-  }
+    try {
+      final cardCount = _getCurrentResultCount();
 
-  /// Get quality metrics for search results
-  SearchResultsQuality verifySearchResultsQuality() {
-    logAction('Analyzing search results quality');
-
-    final cardCount = countHotelCards();
-    if (cardCount == 0) {
-      return SearchResultsQuality.empty();
-    }
-
-    int cardsWithFavoriteButtons = 0;
-    int cardsWithText = 0;
-    List<String> hotelIds = [];
-
-    for (int i = 0; i < cardCount; i++) {
-      try {
-        final cardWidget = find.byType(Card).at(i);
-
-        // Check for favorite button
-        if (_cardHasFavoriteButton(cardWidget)) {
-          cardsWithFavoriteButtons++;
-        }
-
-        // Check for text content
-        if (_cardHasTextContent(cardWidget)) {
-          cardsWithText++;
-        }
-
-        // Extract hotel ID if possible
-        final hotelId = _extractHotelIdFromCard(i);
-        if (hotelId.isNotEmpty) {
-          hotelIds.add(hotelId);
-        }
-      } catch (e) {
-        logAction('Error analyzing card $i: $e');
+      if (cardCount == 0) {
+        return SearchQualityMetrics.empty();
       }
+
+      int cardsWithFavorites = 0;
+      int cardsWithText = 0;
+      List<String> extractedIds = [];
+
+      // Analyze each card
+      for (int i = 0; i < cardCount; i++) {
+        try {
+          final cardWidget = find.byType(Card).at(i);
+
+          // Check for favorite button
+          if (_cardHasFavoriteButton(cardWidget)) {
+            cardsWithFavorites++;
+          }
+
+          // Check for text content
+          if (_cardHasTextContent(cardWidget)) {
+            cardsWithText++;
+          }
+
+          // Extract ID if possible
+          final cardId = _extractCardIdentifier(i);
+          if (cardId.isNotEmpty) {
+            extractedIds.add(cardId);
+          }
+        } catch (e) {
+          logWarning('Error analyzing card $i: $e');
+        }
+      }
+
+      final metrics = SearchQualityMetrics(
+        totalCards: cardCount,
+        cardsWithFavorites: cardsWithFavorites,
+        cardsWithText: cardsWithText,
+        extractedIds: extractedIds,
+      );
+
+      logSuccess('Search quality analysis: ${metrics.toString()}');
+      return metrics;
+    } catch (e) {
+      logError('Search quality analysis failed', e);
+      return SearchQualityMetrics.empty();
     }
-
-    final quality = SearchResultsQuality(
-      totalCards: cardCount,
-      cardsWithFavoriteButtons: cardsWithFavoriteButtons,
-      cardsWithTextContent: cardsWithText,
-      hotelIds: hotelIds,
-    );
-
-    logAction('Search results quality: ${quality.toString()}');
-    return quality;
   }
 
-  /// Check if a card has favorite button
+  /// Check if card has favorite button functionality
   bool _cardHasFavoriteButton(Finder cardWidget) {
-    final favoriteButton = find.descendant(
-      of: cardWidget,
-      matching: find.byIcon(Icons.favorite_outline),
-    );
-    final filledFavoriteButton = find.descendant(
-      of: cardWidget,
-      matching: find.byIcon(Icons.favorite),
-    );
+    final outlineButton = find.descendant(
+        of: cardWidget, matching: find.byIcon(Icons.favorite_outline));
+    final filledButton =
+        find.descendant(of: cardWidget, matching: find.byIcon(Icons.favorite));
 
-    return favoriteButton.evaluate().isNotEmpty ||
-        filledFavoriteButton.evaluate().isNotEmpty;
+    return outlineButton.evaluate().isNotEmpty ||
+        filledButton.evaluate().isNotEmpty;
   }
 
-  /// Check if a card has text content
+  /// Check if card has text content
   bool _cardHasTextContent(Finder cardWidget) {
-    final textWidgets = find.descendant(
-      of: cardWidget,
-      matching: find.byType(Text),
-    );
+    final textWidgets =
+        find.descendant(of: cardWidget, matching: find.byType(Text));
     return textWidgets.evaluate().isNotEmpty;
   }
 
-  /// Extract hotel ID from card at specific index
-  String _extractHotelIdFromCard(int cardIndex) {
+  /// Extract card identifier for tracking
+  String _extractCardIdentifier(int cardIndex) {
     try {
       final cardElement = find.byType(Card).at(cardIndex).evaluate().first;
       final cardWidget = cardElement.widget;
-      return _extractHotelIdFromWidget(cardWidget);
+
+      final key = cardWidget.key;
+      if (key is Key) {
+        final keyString = key.toString();
+        final match = RegExp(r'hotel_card_([0-9\.\-,]+)').firstMatch(keyString);
+        return match?.group(1) ?? '';
+      }
+
+      return '';
     } catch (e) {
-      logAction('Could not extract ID for card at index $cardIndex: $e');
+      logWarning('Could not extract identifier for card $cardIndex: $e');
       return '';
     }
   }
 
-  /// Extract hotel ID from widget key
-  String _extractHotelIdFromWidget(Widget cardWidget) {
-    final key = cardWidget.key;
-    if (key is Key) {
-      final keyString = key.toString();
-      // Extract coordinates from key format: [<'hotel_card_48.8566,2.3522'>]
-      final match = RegExp(r'hotel_card_([0-9\.\-,]+)').firstMatch(keyString);
-      if (match != null) {
-        return match.group(1) ?? '';
-      }
-    }
-    return '';
-  }
-
   // =============================================================================
-  // STATE VERIFICATION METHODS
+  // STATE VERIFICATION WITH ENHANCED LOCATORS
   // =============================================================================
 
-  /// Verify empty state is displayed (when no search query entered)
+  /// Verify empty state using HotelsLocators
   void verifyEmptyState() {
     logAction('Verifying empty state display');
-    verifyElementExists(AppLocators.hotelsEmptyStateIcon);
-    verifyElementNotExists(AppLocators.hotelsList);
+
+    try {
+      expect(HotelsLocators.isEmpty, isTrue,
+          reason: 'Page should show empty state');
+      verifyElementExists(HotelsLocators.emptyStateIcon,
+          description: 'Empty state icon');
+      logSuccess('Empty state verified');
+    } catch (e) {
+      logError('Empty state verification failed', e);
+      rethrow;
+    }
   }
 
-  /// Verify error state is displayed with retry option
+  /// Verify error state using HotelsLocators
   void verifyErrorState() {
     logAction('Verifying error state display');
-    verifyElementExists(AppLocators.hotelsErrorMessage);
-    verifyElementExists(AppLocators.hotelsRetryButton);
+
+    try {
+      expect(HotelsLocators.hasError, isTrue,
+          reason: 'Page should show error state');
+      verifyElementExists(HotelsLocators.errorMessage,
+          description: 'Error message');
+      verifyElementExists(HotelsLocators.retryButton,
+          description: 'Retry button');
+      logSuccess('Error state verified');
+    } catch (e) {
+      logError('Error state verification failed', e);
+      rethrow;
+    }
   }
 
-  /// Check if search is currently in loading state
-  bool isSearchLoading() {
-    final loadingIndicator =
-        find.byKey(Key(AppLocators.hotelsLoadingIndicator));
-    final paginationLoading =
-        find.byKey(Key(AppLocators.hotelsPaginationLoading));
-
-    final isLoading = loadingIndicator.evaluate().isNotEmpty ||
-        paginationLoading.evaluate().isNotEmpty;
-    logAction('Search loading state: $isLoading');
-    return isLoading;
+  /// Check current page state using HotelsLocators
+  HotelsPageState getCurrentPageState() {
+    final state = HotelsLocators.currentState;
+    logAction('Current page state: ${state.description}');
+    return state;
   }
 
-  /// Check if search resulted in error
-  bool hasSearchError() {
-    final errorMessage = find.byKey(Key(AppLocators.hotelsErrorMessage));
-    final retryButton = find.byKey(Key(AppLocators.hotelsRetryButton));
+  /// Comprehensive state validation
+  Future<void> validateCurrentState({String? expectedState}) async {
+    logAction('Validating current page state');
 
-    final hasError =
-        errorMessage.evaluate().isNotEmpty || retryButton.evaluate().isNotEmpty;
-    logAction('Search error state: $hasError');
-    return hasError;
-  }
+    final currentState = getCurrentPageState();
 
-  /// Check if search shows empty state
-  bool hasEmptySearchState() {
-    final emptyStateIcon = find.byKey(Key(AppLocators.hotelsEmptyStateIcon));
-    final isEmpty = emptyStateIcon.evaluate().isNotEmpty;
-    logAction('Empty search state: $isEmpty');
-    return isEmpty;
+    if (expectedState != null) {
+      expect(currentState.name, equals(expectedState),
+          reason: 'Page should be in $expectedState state');
+    }
+
+    // State-specific validations
+    switch (currentState) {
+      case HotelsPageState.hasResults:
+        HotelsLocators.validateHotelCards();
+        break;
+      case HotelsPageState.empty:
+        verifyEmptyState();
+        break;
+      case HotelsPageState.error:
+        verifyErrorState();
+        break;
+      case HotelsPageState.loading:
+        expect(HotelsLocators.isLoading, isTrue,
+            reason: 'Loading indicator should be visible');
+        break;
+      default:
+        logWarning('Unknown state: ${currentState.description}');
+    }
+
+    await takePageScreenshot('state_validated_${currentState.name}');
+    logSuccess('State validation completed: ${currentState.description}');
   }
 
   // =============================================================================
-  // ERROR HANDLING AND RETRY OPERATIONS
+  // FAVORITES OPERATIONS WITH ENHANCED TRACKING
   // =============================================================================
 
-  /// Retry a failed search operation
-  Future<void> retrySearch() async {
-    logAction('Retrying failed search operation');
-    await tapElement(AppLocators.hotelsRetryButton);
-    await waitForLoadingToComplete();
-    await takePageScreenshot('search_retried');
-  }
-
-  /// Retry failed pagination operation
-  Future<void> retryPagination() async {
-    logAction('Retrying failed pagination operation');
-    await tapElement(AppLocators.hotelsPaginationRetryButton);
-    await waitForLoadingToComplete();
-    await takePageScreenshot('pagination_retried');
-  }
-
-  // =============================================================================
-  // FAVORITES OPERATIONS
-  // =============================================================================
-
-  /// Toggle favorite status for a specific hotel by ID
+  /// Toggle favorite status for hotel with comprehensive error handling
   Future<void> toggleHotelFavorite(String hotelId) async {
-    logAction('Toggling favorite status for hotel: $hotelId');
+    logAction('Toggling favorite for hotel: $hotelId');
 
-    final hotelCardKey = AppLocators.hotelCard(hotelId);
-    await _ensureHotelCardIsVisible(hotelCardKey);
+    try {
+      // Ensure hotel card is visible
+      await _ensureHotelCardVisibility(hotelId);
 
-    final favoriteButton = await _findFavoriteButtonInCard(hotelCardKey);
-    await $(favoriteButton).tap();
+      // Find and interact with favorite button
+      final favoriteButton = await _locateFavoriteButton(hotelId);
+      await $(favoriteButton).tap();
 
-    await $.pump(const Duration(milliseconds: 500));
-    await takePageScreenshot('hotel_favorite_toggled_$hotelId');
+      // Wait for state change
+      await $.pump(const Duration(milliseconds: 600));
 
-    logAction('Successfully toggled favorite for hotel: $hotelId');
+      await takePageScreenshot('favorite_toggled_$hotelId');
+      logSuccess('Successfully toggled favorite for hotel: $hotelId');
+    } catch (e) {
+      logError('Failed to toggle favorite for hotel: $hotelId', e);
+      await takeErrorScreenshot('favorite_toggle_failed_$hotelId');
+      rethrow;
+    }
   }
 
-  /// Ensure hotel card is visible, scroll if necessary
-  Future<void> _ensureHotelCardIsVisible(String hotelCardKey) async {
-    if (!isElementVisible(hotelCardKey)) {
+  /// Ensure hotel card is visible on screen
+  Future<void> _ensureHotelCardVisibility(String hotelId) async {
+    final hotelCardKey = HotelsLocators.hotelCard(hotelId);
+
+    if (!HotelsLocators.hotelCardExists(hotelId)) {
+      // Try scrolling to find the card
       await scrollToElement(
-        AppLocators.hotelsScrollView,
+        HotelsLocators.scrollView,
         hotelCardKey,
-        maxScrolls: 5,
+        maxScrolls: 8,
+        description: 'Hotel card: $hotelId',
       );
     }
   }
 
-  /// Find the favorite button within a hotel card
-  Future<Finder> _findFavoriteButtonInCard(String hotelCardKey) async {
-    final hotelCard = find.byKey(Key(hotelCardKey));
+  /// Locate favorite button within hotel card
+  Future<Finder> _locateFavoriteButton(String hotelId) async {
+    final hotelCardFinder = HotelsLocators.hotelCardFinder(hotelId);
 
-    if (hotelCard.evaluate().isEmpty) {
-      throw Exception('Hotel card not found: $hotelCardKey');
+    if (hotelCardFinder.evaluate().isEmpty) {
+      throw Exception('Hotel card not found: $hotelId');
     }
 
-    // Try to find outline favorite button first (not favorited)
+    // Try outline button first (not favorited)
     var favoriteButton = find.descendant(
-      of: hotelCard,
+      of: hotelCardFinder,
       matching: find.byIcon(Icons.favorite_outline),
     );
 
-    // If not found, try filled favorite button (already favorited)
+    // Try filled button (already favorited)
     if (favoriteButton.evaluate().isEmpty) {
       favoriteButton = find.descendant(
-        of: hotelCard,
+        of: hotelCardFinder,
         matching: find.byIcon(Icons.favorite),
       );
     }
 
     if (favoriteButton.evaluate().isEmpty) {
-      throw Exception('No favorite button found in hotel card: $hotelCardKey');
+      throw Exception('Favorite button not found in hotel card: $hotelId');
     }
 
     return favoriteButton.first;
   }
 
-  /// Add multiple hotels to favorites for testing purposes
+  /// Add multiple hotels to favorites for bulk testing
   Future<List<String>> addMultipleHotelsToFavorites(
       {int maxFavorites = 3}) async {
     logAction('Adding multiple hotels to favorites (max: $maxFavorites)');
 
-    final results = await verifySearchResultsQuality();
-    final availableHotelIds = results.hotelIds;
-    final favoritesToAdd = availableHotelIds.length >= maxFavorites
-        ? maxFavorites
-        : availableHotelIds.length;
+    try {
+      final currentResults = await _analyzeSearchQuality();
+      final availableIds = currentResults.extractedIds;
+      final targetCount = availableIds.length >= maxFavorites
+          ? maxFavorites
+          : availableIds.length;
 
-    List<String> successfullyAdded = [];
+      List<String> successfullyAdded = [];
 
-    for (int i = 0; i < favoritesToAdd && i < availableHotelIds.length; i++) {
-      try {
-        final hotelId = availableHotelIds[i];
-        await toggleHotelFavorite(hotelId);
-        successfullyAdded.add(hotelId);
-        logAction(
-            '✅ Added hotel $hotelId to favorites (${successfullyAdded.length}/$favoritesToAdd)');
-      } catch (e) {
-        logAction('⚠️ Failed to add hotel to favorites: $e');
+      for (int i = 0; i < targetCount && i < availableIds.length; i++) {
+        try {
+          final hotelId = availableIds[i];
+          await toggleHotelFavorite(hotelId);
+          successfullyAdded.add(hotelId);
+          logSuccess(
+              'Added hotel $hotelId to favorites (${successfullyAdded.length}/$targetCount)');
+        } catch (e) {
+          logWarning('Failed to add hotel to favorites: $e');
+        }
       }
-    }
 
-    logAction(
-        'Successfully added ${successfullyAdded.length} hotels to favorites');
-    return successfullyAdded;
+      logSuccess(
+          'Successfully added ${successfullyAdded.length} hotels to favorites');
+      return successfullyAdded;
+    } catch (e) {
+      logError('Bulk favorite addition failed', e);
+      return [];
+    }
   }
 
   // =============================================================================
-  // PAGINATION OPERATIONS
+  // PAGINATION WITH ENHANCED ERROR HANDLING
   // =============================================================================
 
-  /// Scroll to load more hotels (trigger pagination)
-  Future<void> scrollToLoadMore() async {
-    logAction('Scrolling to trigger pagination');
+  /// Test pagination functionality with comprehensive validation
+  Future<PaginationTestResult> testPagination() async {
+    logAction('Testing pagination functionality');
 
-    final scrollView = find.byKey(Key(AppLocators.hotelsScrollView));
+    try {
+      final initialCount = _getCurrentResultCount();
+      logAction('Initial card count: $initialCount');
+
+      // Trigger pagination scroll
+      await _executePaginationScroll();
+
+      // Wait for pagination processing
+      await _waitForPaginationCompletion();
+
+      final finalCount = _getCurrentResultCount();
+      logAction('Final card count: $finalCount');
+
+      final result = PaginationTestResult(
+        initialCount: initialCount,
+        finalCount: finalCount,
+        newItemsLoaded: finalCount - initialCount,
+        wasSuccessful: finalCount > initialCount,
+      );
+
+      await takePageScreenshot('pagination_tested');
+
+      if (result.wasSuccessful) {
+        logSuccess(
+            'Pagination loaded ${result.newItemsLoaded} additional items');
+      } else {
+        logAction('No additional items loaded (may be end of results)');
+      }
+
+      return result;
+    } catch (e) {
+      logError('Pagination test failed', e);
+      return PaginationTestResult(
+        initialCount: 0,
+        finalCount: 0,
+        newItemsLoaded: 0,
+        wasSuccessful: false,
+      );
+    }
+  }
+
+  /// Execute pagination scroll
+  Future<void> _executePaginationScroll() async {
+    logAction('Executing pagination scroll');
+
+    final scrollView = find.byKey(Key(HotelsLocators.scrollView));
     if (scrollView.evaluate().isNotEmpty) {
-      await $(scrollView.first).scrollTo(maxScrolls: 3);
+      await $(scrollView.first).scrollTo(maxScrolls: 5);
+      logSuccess('Pagination scroll executed');
+    } else {
+      throw Exception('Scroll view not found for pagination');
+    }
+  }
+
+  /// Wait for pagination to complete
+  Future<void> _waitForPaginationCompletion() async {
+    logAction('Waiting for pagination completion');
+
+    // Check if pagination loading appears
+    if (isElementVisible(HotelsLocators.paginationLoading)) {
+      logAction('Pagination loading detected');
+      await waitForElementToDisappear(HotelsLocators.paginationLoading,
+          timeout: const Duration(seconds: 15));
+    }
+
+    await $.pump(const Duration(seconds: 2)); // Allow results to render
+    logSuccess('Pagination completion wait finished');
+  }
+
+  // =============================================================================
+  // ERROR HANDLING AND RECOVERY
+  // =============================================================================
+
+  /// Retry failed search operation
+  Future<void> retrySearch() async {
+    logAction('Retrying failed search operation');
+
+    try {
+      await tapElement(HotelsLocators.retryButton,
+          description: 'Search retry button');
       await waitForLoadingToComplete();
-      logAction('Pagination scroll completed');
+      await takePageScreenshot('search_retried');
+      logSuccess('Search retry executed');
+    } catch (e) {
+      logError('Search retry failed', e);
+      rethrow;
+    }
+  }
+
+  /// Retry failed pagination
+  Future<void> retryPagination() async {
+    logAction('Retrying failed pagination operation');
+
+    try {
+      await tapElement(HotelsLocators.paginationRetryButton,
+          description: 'Pagination retry button');
+      await waitForLoadingToComplete();
+      await takePageScreenshot('pagination_retried');
+      logSuccess('Pagination retry executed');
+    } catch (e) {
+      logError('Pagination retry failed', e);
+      rethrow;
+    }
+  }
+
+  // =============================================================================
+  // COMPREHENSIVE TEST WORKFLOWS
+  // =============================================================================
+
+  /// Execute comprehensive search workflow
+  Future<SearchWorkflowResult> executeSearchWorkflow(
+      List<String> queries) async {
+    logAction(
+        'Executing comprehensive search workflow with ${queries.length} queries');
+
+    final results = <SearchExecutionResult>[];
+
+    try {
+      for (final query in queries) {
+        final result = await performSearchTest(query);
+        results.add(result);
+
+        // Clear between searches
+        await clearSearchField();
+        await $.pump(const Duration(seconds: 1));
+      }
+
+      final workflow = SearchWorkflowResult(
+        totalQueries: queries.length,
+        results: results,
+        successfulQueries: results.where((r) => r.wasSuccessful).length,
+        totalResultsFound: results.fold(0, (sum, r) => sum + r.resultCount),
+      );
+
+      logSuccess('Search workflow completed: ${workflow.toString()}');
+      return workflow;
+    } catch (e) {
+      logError('Search workflow failed', e);
+      return SearchWorkflowResult(
+        totalQueries: queries.length,
+        results: results,
+        successfulQueries: 0,
+        totalResultsFound: 0,
+      );
+    }
+  }
+
+  /// Verify hotels list is scrollable and functional
+  Future<void> verifyHotelsListScrollable() async {
+    logAction('Verifying hotels list scrollability');
+
+    final scrollView = find.byKey(Key(HotelsLocators.scrollView));
+    if (scrollView.evaluate().isNotEmpty) {
+      try {
+        await $(scrollView.first).scrollTo();
+        await $.pumpAndSettle();
+        logSuccess('Hotels list is scrollable and functional');
+      } catch (e) {
+        logError('Error testing scroll functionality: $e');
+        throw Exception('Hotels list scroll test failed: $e');
+      }
     } else {
       throw Exception('Hotels scroll view not found');
     }
   }
 
-  /// Test pagination functionality by scrolling and verifying results
-  Future<PaginationTestResult> testPagination() async {
-    logAction('Testing pagination functionality');
-
-    final initialCount = countHotelCards();
-    logAction('Initial hotel count before pagination: $initialCount');
-
-    await scrollToLoadMore();
-
-    // Wait for pagination loading to appear and disappear
-    if (isElementVisible(AppLocators.hotelsPaginationLoading)) {
-      logAction('Pagination loading indicator appeared');
-      await waitForElementToDisappear(AppLocators.hotelsPaginationLoading);
-    }
-
-    await $.pump(const Duration(seconds: 2)); // Allow results to load
-
-    final finalCount = countHotelCards();
-    logAction('Final hotel count after pagination: $finalCount');
-
-    final result = PaginationTestResult(
-      initialCount: initialCount,
-      finalCount: finalCount,
-      newItemsLoaded: finalCount - initialCount,
-      wasSuccessful: finalCount > initialCount,
-    );
-
-    if (result.wasSuccessful) {
-      logAction(
-          '✅ Pagination loaded ${result.newItemsLoaded} additional results');
-    } else {
-      logAction('ℹ️ No additional results loaded (might be end of list)');
-    }
-
-    return result;
-  }
-
-  /// Verify pagination loading indicator is displayed
-  void verifyPaginationLoading() {
-    logAction('Verifying pagination loading indicator');
-    verifyElementExists(AppLocators.hotelsPaginationLoading);
-  }
-
-  /// Verify pagination error state is displayed
-  void verifyPaginationError() {
-    logAction('Verifying pagination error state');
-    verifyElementExists(AppLocators.hotelsPaginationErrorMessage);
-    verifyElementExists(AppLocators.hotelsPaginationRetryButton);
-  }
-
-  // =============================================================================
-  // COMPREHENSIVE TEST METHODS
-  // =============================================================================
-
-  /// Perform comprehensive search test for a given query
-  Future<SearchTestResult> performComprehensiveSearchTest(String query) async {
-    logAction('Performing comprehensive search test for: "$query"');
-
-    final startTime = DateTime.now();
-
-    try {
-      await searchHotels(query);
-      await waitForSearchResults();
-
-      final quality = verifySearchResultsQuality();
-      final endTime = DateTime.now();
-
-      final result = SearchTestResult(
-        query: query,
-        wasSuccessful: true,
-        resultsCount: quality.totalCards,
-        duration: endTime.difference(startTime),
-        quality: quality,
-      );
-
-      // Test pagination if results exist
-      if (result.resultsCount > 0) {
-        result.paginationResult = await testPagination();
-      }
-
-      logAction('✅ Comprehensive search test completed for: "$query"');
-      return result;
-    } catch (e) {
-      final endTime = DateTime.now();
-      logAction('❌ Search test failed for "$query": $e');
-
-      return SearchTestResult(
-        query: query,
-        wasSuccessful: false,
-        resultsCount: 0,
-        duration: endTime.difference(startTime),
-        error: e.toString(),
-      );
-    }
-  }
-
-  /// Test search functionality with multiple queries
-  Future<List<SearchTestResult>> testMultipleSearches(
+  /// Test multiple search scenarios for comprehensive validation
+  Future<List<SearchExecutionResult>> testMultipleSearches(
       List<String> queries) async {
     logAction('Testing multiple search queries: ${queries.join(", ")}');
 
-    List<SearchTestResult> results = [];
+    List<SearchExecutionResult> results = [];
 
     for (final query in queries) {
-      final result = await performComprehensiveSearchTest(query);
+      final result = await performSearchTest(query);
       results.add(result);
 
       // Clear search between queries
@@ -578,10 +769,10 @@ class HotelsPage extends BasePage {
   }
 
   /// Log summary of multiple search results
-  void _logMultipleSearchResults(List<SearchTestResult> results) {
+  void _logMultipleSearchResults(List<SearchExecutionResult> results) {
     final successful = results.where((r) => r.wasSuccessful).length;
     final failed = results.length - successful;
-    final totalResults = results.fold<int>(0, (sum, r) => sum + r.resultsCount);
+    final totalResults = results.fold<int>(0, (sum, r) => sum + r.resultCount);
 
     logAction('Multiple search test summary:');
     logAction('  - Total queries: ${results.length}');
@@ -589,63 +780,70 @@ class HotelsPage extends BasePage {
     logAction('  - Failed: $failed');
     logAction('  - Total results found: $totalResults');
   }
-
-  /// Verify hotels list is scrollable and functional
-  Future<void> verifyHotelsListScrollable() async {
-    logAction('Verifying hotels list scrollability');
-
-    final scrollView = find.byKey(Key(AppLocators.hotelsScrollView));
-    if (scrollView.evaluate().isNotEmpty) {
-      try {
-        await $(scrollView.first).scrollTo();
-        await $.pumpAndSettle();
-        logAction('✅ Hotels list is scrollable and functional');
-      } catch (e) {
-        logAction('❌ Error testing scroll functionality: $e');
-        throw Exception('Hotels list scroll test failed: $e');
-      }
-    } else {
-      throw Exception('Hotels scroll view not found');
-    }
-  }
 }
 
 // =============================================================================
-// SUPPORTING DATA CLASSES
+// SUPPORTING DATA CLASSES FOR ENHANCED TESTING
 // =============================================================================
 
-/// Represents the quality metrics of search results
-class SearchResultsQuality {
-  final int totalCards;
-  final int cardsWithFavoriteButtons;
-  final int cardsWithTextContent;
-  final List<String> hotelIds;
+/// Enhanced search execution result
+class SearchExecutionResult {
+  final String query;
+  final SearchResultState state;
+  final Duration duration;
+  final int resultCount;
+  final bool wasSuccessful;
+  final String? error;
+  SearchQualityMetrics? quality;
 
-  SearchResultsQuality({
-    required this.totalCards,
-    required this.cardsWithFavoriteButtons,
-    required this.cardsWithTextContent,
-    required this.hotelIds,
+  SearchExecutionResult({
+    required this.query,
+    required this.state,
+    required this.duration,
+    required this.resultCount,
+    required this.wasSuccessful,
+    this.error,
+    this.quality,
   });
-
-  SearchResultsQuality.empty()
-      : totalCards = 0,
-        cardsWithFavoriteButtons = 0,
-        cardsWithTextContent = 0,
-        hotelIds = [];
-
-  bool get hasGoodQuality =>
-      totalCards > 0 &&
-      cardsWithFavoriteButtons == totalCards &&
-      cardsWithTextContent == totalCards;
 
   @override
   String toString() {
-    return 'SearchResultsQuality(total: $totalCards, withFavorites: $cardsWithFavoriteButtons, withText: $cardsWithTextContent, hasGoodQuality: $hasGoodQuality)';
+    return 'SearchResult(query: "$query", state: ${state.name}, results: $resultCount, duration: ${duration.inMilliseconds}ms, success: $wasSuccessful)';
   }
 }
 
-/// Represents the result of a pagination test
+/// Search quality metrics for detailed analysis
+class SearchQualityMetrics {
+  final int totalCards;
+  final int cardsWithFavorites;
+  final int cardsWithText;
+  final List<String> extractedIds;
+
+  SearchQualityMetrics({
+    required this.totalCards,
+    required this.cardsWithFavorites,
+    required this.cardsWithText,
+    required this.extractedIds,
+  });
+
+  SearchQualityMetrics.empty()
+      : totalCards = 0,
+        cardsWithFavorites = 0,
+        cardsWithText = 0,
+        extractedIds = [];
+
+  bool get hasGoodQuality =>
+      totalCards > 0 &&
+      cardsWithFavorites == totalCards &&
+      cardsWithText == totalCards;
+
+  @override
+  String toString() {
+    return 'Quality(total: $totalCards, withFavorites: $cardsWithFavorites, withText: $cardsWithText, good: $hasGoodQuality)';
+  }
+}
+
+/// Pagination test result
 class PaginationTestResult {
   final int initialCount;
   final int finalCount;
@@ -661,32 +859,29 @@ class PaginationTestResult {
 
   @override
   String toString() {
-    return 'PaginationTestResult(initial: $initialCount, final: $finalCount, new: $newItemsLoaded, successful: $wasSuccessful)';
+    return 'Pagination(initial: $initialCount, final: $finalCount, new: $newItemsLoaded, success: $wasSuccessful)';
   }
 }
 
-/// Represents the result of a comprehensive search test
-class SearchTestResult {
-  final String query;
-  final bool wasSuccessful;
-  final int resultsCount;
-  final Duration duration;
-  final SearchResultsQuality? quality;
-  final String? error;
-  PaginationTestResult? paginationResult;
+/// Search workflow result for comprehensive testing
+class SearchWorkflowResult {
+  final int totalQueries;
+  final List<SearchExecutionResult> results;
+  final int successfulQueries;
+  final int totalResultsFound;
 
-  SearchTestResult({
-    required this.query,
-    required this.wasSuccessful,
-    required this.resultsCount,
-    required this.duration,
-    this.quality,
-    this.error,
-    this.paginationResult,
+  SearchWorkflowResult({
+    required this.totalQueries,
+    required this.results,
+    required this.successfulQueries,
+    required this.totalResultsFound,
   });
+
+  double get successRate =>
+      totalQueries > 0 ? (successfulQueries / totalQueries) : 0.0;
 
   @override
   String toString() {
-    return 'SearchTestResult(query: "$query", successful: $wasSuccessful, results: $resultsCount, duration: ${duration.inMilliseconds}ms)';
+    return 'Workflow(queries: $totalQueries, successful: $successfulQueries, rate: ${(successRate * 100).toStringAsFixed(1)}%, results: $totalResultsFound)';
   }
 }

@@ -3,26 +3,25 @@ import 'package:patrol/patrol.dart';
 
 import '../helpers/test_helper.dart';
 import '../page_objects/dashboard_page.dart';
-import '../../__backup/overview_page.dart';
 import '../page_objects/hotels_page.dart';
 import '../page_objects/favorites_page.dart';
-import '../../__backup/account_page.dart';
+
 
 class BaseTestHelper {
   static late DashboardPage dashboardPage;
-  static late OverviewPage overviewPage;
+
   static late HotelsPage hotelsPage;
   static late FavoritesPage favoritesPage;
-  static late AccountPage accountPage;
+
 
   static Future<void> initializeTest(PatrolIntegrationTester $) async {
     await PatrolTestHelper.initializeApp($);
 
     dashboardPage = DashboardPage($);
-    overviewPage = OverviewPage($);
+
     hotelsPage = HotelsPage($);
     favoritesPage = FavoritesPage($);
-    accountPage = AccountPage($);
+  
 
     await dashboardPage.verifyDashboardLoaded();
   }

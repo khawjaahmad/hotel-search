@@ -1,3 +1,16 @@
+import '../helpers/test_helper.dart';
+import '../locators/app_locators.dart';
+import '../page_objects/dashboard_page.dart';
+import '../page_objects/hotels_page.dart';
+import '../page_objects/favorites_page.dart';
+void dashboardTests() {
+group('🏠 Dashboard - Navigation & Core Functionality', () {
+late DashboardPage dashboardPage;
+late OverviewPage overviewPage;
+late HotelsPage hotelsPage;
+late FavoritesPage favoritesPage;
+late AccountPage accountPage;
+
 Future<void> initializeTest(PatrolIntegrationTester $) async {
   await PatrolTestHelper.initializeApp($);
   dashboardPage = DashboardPage($);
@@ -354,3 +367,8 @@ patrolTest(
     }
   },
 );
+
+});
+}
+void main() {
+dashboardTests();
