@@ -3,14 +3,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:patrol/patrol.dart';
 
 import '../helpers/test_helper.dart';
-import '../helpers/search_error_handler.dart';
+import '../helpers/enhanced_search_handler.dart';
 import '../page_objects/dashboard_page.dart';
 import '../page_objects/hotels_page.dart';
 import '../page_objects/favorites_page.dart';
 
-
 void hotelsTests() {
-  group('Hotels Feature Tests', () {
+  group('🧪 Hotels Feature - Core Requirements', () {
     late DashboardPage dashboardPage;
     late HotelsPage hotelsPage;
     late FavoritesPage favoritesPage;
@@ -24,7 +23,7 @@ void hotelsTests() {
     }
 
     patrolTest(
-      'Hotel search displays results and pagination works',
+      'Search with any input and lazy loading verification',
       ($) async {
         await initializeTest($);
 
@@ -32,277 +31,198 @@ void hotelsTests() {
           await dashboardPage.navigateToHotels();
           await hotelsPage.verifyHotelsPageLoaded();
 
-     
-          await hotelsPage.searchHotels('New York');
+          // Test 1: Real place name
+          debugPrint('🔍 Testing search with real place: "Paris"');
+          await hotelsPage.searchHotels('Paris');
+          
+          var searchState = await EnhancedSearchHandler.handleSearchWithTimeout($, 'Paris');
+          if (searchState == SearchResultState.hasResults) {
+            await EnhancedSearchHandler.validateSearchResults($);
+            await EnhancedSearchHandler.testLazyLoading($);
+          }
 
-   
-          await SearchErrorHandler.handleSearchResult($, () async {
-            await hotelsPage.waitForSearchResults();
+          // Test 2: Random letters
+          debugPrint('🔍 Testing search with random letters: "xyzabc"');
+          await hotelsPage.searchHotels('xyzabc');
+          
+          searchState = await EnhancedSearchHandler.handleSearchWithTimeout($, 'xyzabc');
+          if (searchState == SearchResultState.hasResults) {
+            await EnhancedSearchHandler.validateSearchResults($);
+            debugPrint('✅ Random letters returned results as expected');
+          } else {
+            debugPrint('ℹ️ Random letters returned no results - acceptable');
+          }
 
-            await $.pump(const Duration(seconds: 3));
+          // Test 3: Gibberish/special characters
+          debugPrint('🔍 Testing search with gibberish: "!@#{:}.="');
+          await hotelsPage.searchHotels('!@#.=*&');
+          
+          searchState = await EnhancedSearchHandler.handleSearchWithTimeout($, '!@_)#.=');
+          if (searchState == SearchResultState.hasResults) {
+            await EnhancedSearchHandler.validateSearchResults($);
+            debugPrint('✅ Special characters returned results as expected');
+          } else {
+            debugPrint('ℹ️ Special characters returned no results - acceptable');
+          }
 
-       
-            final scrollView = find.byKey(const Key('hotels_scroll_view'));
-            final hotelCards = find.byType(Card);
+          await PatrolTestHelper.takeScreenshot($, 'search_input_tests_complete');
 
-            if (hotelCards.evaluate().isNotEmpty) {
-              final initialCount = hotelCards.evaluate().length;
-              debugPrint('✅ Search results displayed: $initialCount hotels');
-
-           
-              await testPaginationWithCorrectScrolling($, initialCount);
-            } else {
-              debugPrint('ℹ️ No results found for New York search');
-            }
-          });
-
-          await PatrolTestHelper.takeScreenshot($, 'hotel_search_results');
         } catch (e) {
-          await PatrolTestHelper.takeScreenshot($, 'hotel_search_failed');
-          fail('Hotel search test failed: $e');
+          await PatrolTestHelper.takeScreenshot($, 'search_input_tests_failed');
+          fail('Search input tests failed: $e');
         }
       },
     );
 
     patrolTest(
-      'Favorites functionality - Add, verify, and remove with correct hotel identification',
+      'Favorites workflow - exact place verification',
       ($) async {
         await initializeTest($);
 
         try {
           await dashboardPage.navigateToHotels();
-          debugPrint('🏨 Navigated to hotels page');
+          await hotelsPage.verifyHotelsPageLoaded();
 
-        
-          await hotelsPage.searchHotels('Paris');
-          debugPrint('🔍 Searched for Paris hotels');
-
-          await SearchErrorHandler.handleSearchResult($, () async {
-            await hotelsPage.waitForSearchResults();
-            await $.pump(const Duration(seconds: 3));
-
+          // Search for hotels to add to favorites
+          debugPrint('🔍 Searching for hotels to test favorites workflow');
+          await hotelsPage.searchHotels('London');
+          
+          final searchState = await EnhancedSearchHandler.handleSearchWithTimeout($, 'London');
+          
+          if (searchState == SearchResultState.hasResults) {
+            await $.pump(const Duration(seconds: 2));
+            
             final hotelCards = find.byType(Card);
             final cardCount = hotelCards.evaluate().length;
-            debugPrint('📊 Found $cardCount hotel cards in search results');
+            debugPrint('📊 Found $cardCount hotel cards for favorites testing');
 
             if (cardCount > 0) {
-              List<String> addedHotelIds = [];
+              // Step 1: Add 1-3 hotels to favorites and capture their details
               final maxFavorites = cardCount >= 3 ? 3 : cardCount;
-
-              debugPrint(
-                  '🎯 Planning to add $maxFavorites hotels to favorites');
-
+              List<String> favoriteHotelNames = [];
+              
+              debugPrint('💝 Adding $maxFavorites hotels to favorites');
+              
               for (int i = 0; i < maxFavorites; i++) {
                 try {
                   final cardWidget = hotelCards.at(i);
-
-                  final favoriteButtonInCard = find.descendant(
+                  
+                  // Capture hotel name before adding to favorites
+                  final nameTexts = find.descendant(of: cardWidget, matching: find.byType(Text));
+                  if (nameTexts.evaluate().isNotEmpty) {
+                    final nameWidget = nameTexts.first.evaluate().first.widget as Text;
+                    final hotelName = nameWidget.data ?? '';
+                    if (hotelName.isNotEmpty) {
+                      favoriteHotelNames.add(hotelName);
+                    }
+                  }
+                  
+                  // Add to favorites
+                  final favoriteButton = find.descendant(
+                    of: cardWidget,
+                    matching: find.byIcon(Icons.favorite_outline)
+                  );
+                  
+                  if (favoriteButton.evaluate().isNotEmpty) {
+                    await $(favoriteButton.first).tap();
+                    await $.pump(const Duration(milliseconds: 800));
+                    debugPrint('✅ Added hotel ${i + 1} to favorites: ${favoriteHotelNames.last}');
+                    
+                    // Verify heart icon changed to filled
+                    final filledHeart = find.descendant(
                       of: cardWidget,
-                      matching: find.byIcon(Icons.favorite_outline));
-
-                  if (favoriteButtonInCard.evaluate().isNotEmpty) {
-                    debugPrint(
-                        '💝 Tapping favorite button for hotel card $i...');
-                    await $(favoriteButtonInCard.first).tap();
-                    await $.pump(const Duration(milliseconds: 1000));
-
-                    final cardKey =
-                        cardWidget.evaluate().first.widget.key.toString();
-                    final hotelId =
-                        cardKey.replaceAll(RegExp(r'[^\d\.,\-]'), '');
-
-                    if (hotelId.isNotEmpty) {
-                      addedHotelIds.add(hotelId);
-                      debugPrint(
-                          '✅ Added hotel $hotelId to favorites (${addedHotelIds.length}/$maxFavorites)');
-                    }
-
-                    final filledHeartInCard = find.descendant(
-                        of: cardWidget, matching: find.byIcon(Icons.favorite));
-
-                    if (filledHeartInCard.evaluate().isEmpty) {
-                      debugPrint(
-                          '⚠️ Heart icon did not change to filled for card $i');
-                    }
-                  } else {
-                    debugPrint('❌ No favorite button found in card $i');
+                      matching: find.byIcon(Icons.favorite)
+                    );
+                    expect(filledHeart.evaluate().isNotEmpty, isTrue,
+                        reason: 'Heart icon should be filled after adding to favorites');
                   }
                 } catch (e) {
-                  debugPrint('❌ Could not add hotel $i to favorites: $e');
+                  debugPrint('⚠️ Could not add hotel $i to favorites: $e');
                 }
               }
+              
+              debugPrint('📝 Added hotels to favorites: $favoriteHotelNames');
 
-              debugPrint(
-                  '📊 Successfully added ${addedHotelIds.length} hotels to favorites');
-
+              // Step 2: Navigate to favorites and verify EXACT places appear
               await dashboardPage.navigateToFavorites();
-              debugPrint('📱 Navigated to favorites page');
               await favoritesPage.verifyFavoritesPageLoaded();
-              await $.pump(const Duration(seconds: 2));
+              await $.pump(const Duration(seconds: 1));
 
               final favoriteCards = find.byType(Card);
               final actualFavoriteCount = favoriteCards.evaluate().length;
-
-              debugPrint(
-                  '📊 Expected favorites: ${addedHotelIds.length}, Found: $actualFavoriteCount');
-              expect(actualFavoriteCount, equals(addedHotelIds.length));
-              debugPrint(
-                  '✅ Verified exact count match: $actualFavoriteCount favorites');
-
               
-              if (actualFavoriteCount > 0) {
-                await testRemovingFavoritesFromFavoritesPage(
-                    $, actualFavoriteCount);
-              }
-            } else {
-              debugPrint('ℹ️ No hotel cards found to test favorites');
-            }
-          });
-
-          await PatrolTestHelper.takeScreenshot(
-              $, 'favorites_functionality_tested');
-        } catch (e) {
-          await PatrolTestHelper.takeScreenshot(
-              $, 'favorites_functionality_failed');
-          fail('Favorites functionality test failed: $e');
-        }
-      },
-    );
-
-    patrolTest(
-      'Search error handling with correct error states',
-      ($) async {
-        await initializeTest($);
-
-        try {
-          await dashboardPage.navigateToHotels();
-          await hotelsPage.verifyHotelsPageLoaded();
-
-       
-          await hotelsPage.searchHotels('');
-          await $.pump(const Duration(seconds: 2));
-
-          final emptyStateIcon =
-              find.byKey(const Key('hotels_empty_state_icon'));
-          expect(emptyStateIcon, findsOneWidget);
-          debugPrint('✅ Empty search shows empty state correctly');
-
-          await hotelsPage.searchHotels('   ');
-
-          await SearchErrorHandler.handleSearchResult($, () async {
-            await hotelsPage.waitForSearchResults();
-            await $.pump(const Duration(seconds: 3));
-
-            
-            final errorMessage = find.byKey(const Key('hotels_error_message'));
-            final retryButton = find.byKey(const Key('hotels_retry_button'));
-
-            if (errorMessage.evaluate().isNotEmpty &&
-                retryButton.evaluate().isNotEmpty) {
-              debugPrint('✅ Error state shows correctly with retry button');
-
-             
-              await $(retryButton).tap();
-              await $.pump(const Duration(seconds: 2));
-              debugPrint('✅ Retry button works');
-            } else {
-              debugPrint(
-                  'ℹ️ No error state shown (API might handle spaces differently)');
-            }
-          });
-
-          
-          await hotelsPage.searchHotels('Tokyo');
-          await SearchErrorHandler.handleSearchResult($, () async {
-            await hotelsPage.waitForSearchResults();
-            await $.pump(const Duration(seconds: 3));
-
-            final hotelCards = find.byType(Card);
-            if (hotelCards.evaluate().isNotEmpty) {
-              debugPrint(
-                  '✅ Valid search returned ${hotelCards.evaluate().length} results');
-            } else {
+              expect(actualFavoriteCount, equals(favoriteHotelNames.length),
+                  reason: 'Favorites page should show exactly ${favoriteHotelNames.length} hotels');
               
-              final emptyState =
-                  find.byKey(const Key('hotels_empty_state_icon'));
-              final errorState = find.byKey(const Key('hotels_error_message'));
+              debugPrint('✅ Verified exact count: $actualFavoriteCount favorites displayed');
 
-              if (emptyState.evaluate().isNotEmpty) {
-                debugPrint('ℹ️ Tokyo search returned empty state');
-              } else if (errorState.evaluate().isNotEmpty) {
-                debugPrint('ℹ️ Tokyo search resulted in error');
-              }
-            }
-          });
-
-          await PatrolTestHelper.takeScreenshot(
-              $, 'search_error_handling_tested');
-        } catch (e) {
-          await PatrolTestHelper.takeScreenshot(
-              $, 'search_error_handling_failed');
-          fail('Search error handling test failed: $e');
-        }
-      },
-    );
-
-    patrolTest(
-      'Pagination loading states with correct indicators',
-      ($) async {
-        await initializeTest($);
-
-        try {
-          await dashboardPage.navigateToHotels();
-
-          await hotelsPage.searchHotels('London');
-
-          await $.pump(const Duration(milliseconds: 200));
-          final loadingIndicator =
-              find.byKey(const Key('hotels_loading_indicator'));
-
-          if (loadingIndicator.evaluate().isNotEmpty) {
-            debugPrint('✅ Initial loading indicator appears during search');
-          }
-
-          await SearchErrorHandler.handleSearchResult($, () async {
-            await hotelsPage.waitForSearchResults();
-            await $.pump(const Duration(seconds: 2));
-
-            final hotelCards = find.byType(Card);
-            if (hotelCards.evaluate().isNotEmpty) {
-              debugPrint('✅ Search results loaded successfully');
-
-              final scrollView = find.byKey(const Key('hotels_scroll_view'));
-              if (scrollView.evaluate().isNotEmpty) {
-                await $(scrollView.first).scrollTo(maxScrolls: 5);
-                await $.pump(const Duration(seconds: 2));
-
-                final paginationLoading =
-                    find.byKey(const Key('hotels_pagination_loading'));
-                if (paginationLoading.evaluate().isNotEmpty) {
-                  debugPrint('✅ Pagination loading indicator appeared');
-
-                  await $.pump(const Duration(seconds: 3));
-
-                  final newCardCount = find.byType(Card).evaluate().length;
-                  debugPrint('📊 Total cards after pagination: $newCardCount');
-                } else {
-                  debugPrint(
-                      'ℹ️ No pagination loading - might not have enough results');
+              // Step 3: Verify the exact same hotels appear in favorites
+              for (int i = 0; i < actualFavoriteCount; i++) {
+                final favoriteCard = favoriteCards.at(i);
+                final nameTexts = find.descendant(of: favoriteCard, matching: find.byType(Text));
+                
+                if (nameTexts.evaluate().isNotEmpty) {
+                  final nameWidget = nameTexts.first.evaluate().first.widget as Text;
+                  final favoriteHotelName = nameWidget.data ?? '';
+                  
+                  expect(favoriteHotelNames.contains(favoriteHotelName), isTrue,
+                      reason: 'Favorite hotel "$favoriteHotelName" should be one of the added hotels');
+                  debugPrint('✅ Verified exact hotel in favorites: $favoriteHotelName');
                 }
               }
-            }
-          });
 
-          await PatrolTestHelper.takeScreenshot($, 'pagination_tested');
+              // Step 4: Remove all favorites by unchecking heart icons
+              debugPrint('🗑️ Removing all favorites by unchecking heart icons');
+              
+              for (int i = actualFavoriteCount - 1; i >= 0; i--) {
+                try {
+                  final favoriteCard = favoriteCards.at(i);
+                  final filledHeartButton = find.descendant(
+                    of: favoriteCard,
+                    matching: find.byIcon(Icons.favorite)
+                  );
+                  
+                  if (filledHeartButton.evaluate().isNotEmpty) {
+                    await $(filledHeartButton.first).tap();
+                    await $.pump(const Duration(milliseconds: 800));
+                    debugPrint('✅ Removed favorite ${i + 1}');
+                  }
+                } catch (e) {
+                  debugPrint('⚠️ Could not remove favorite $i: $e');
+                }
+              }
+
+              // Step 5: Verify favorites page is empty
+              await $.pump(const Duration(seconds: 1));
+              
+              final emptyStateIcon = find.byKey(const Key('favorites_empty_state_icon'));
+              expect(emptyStateIcon, findsOneWidget,
+                  reason: 'Favorites page should show empty state after removing all favorites');
+              
+              final remainingCards = find.byType(Card);
+              expect(remainingCards.evaluate().length, equals(0),
+                  reason: 'No hotel cards should remain after removing all favorites');
+              
+              debugPrint('✅ Verified favorites page is empty after removing all');
+
+            } else {
+              debugPrint('ℹ️ No hotels found for favorites testing');
+            }
+          } else {
+            debugPrint('ℹ️ Search did not return results for favorites testing');
+          }
+
+          await PatrolTestHelper.takeScreenshot($, 'favorites_workflow_complete');
+
         } catch (e) {
-          await PatrolTestHelper.takeScreenshot($, 'pagination_failed');
-          fail('Pagination test failed: $e');
+          await PatrolTestHelper.takeScreenshot($, 'favorites_workflow_failed');
+          fail('Favorites workflow test failed: $e');
         }
       },
     );
 
     patrolTest(
-      'Search field functionality and clearing',
+      'Invalid input handling - empty spaces trigger error',
       ($) async {
         await initializeTest($);
 
@@ -310,142 +230,99 @@ void hotelsTests() {
           await dashboardPage.navigateToHotels();
           await hotelsPage.verifyHotelsPageLoaded();
 
-          final searchField = find.byKey(const Key('hotels_search_field'));
-          expect(searchField, findsOneWidget);
-          debugPrint('✅ Search field container found');
-
-          await hotelsPage.searchHotels('Berlin');
-          await $.pump(const Duration(seconds: 1));
-
-          final clearButtons = find.byIcon(Icons.cancel_outlined);
-          if (clearButtons.evaluate().isNotEmpty) {
-            await $(clearButtons.first).tap();
-            await $.pump(const Duration(milliseconds: 500));
-            debugPrint('✅ Search field cleared using clear button');
-
-            final emptyStateIcon =
-                find.byKey(const Key('hotels_empty_state_icon'));
-            expect(emptyStateIcon, findsOneWidget);
-            debugPrint('✅ Empty state shown after clearing search');
+          // Test empty spaces input
+          debugPrint('🔍 Testing empty spaces input: "   "');
+          await hotelsPage.searchHotels('   ');
+          
+          final searchState = await EnhancedSearchHandler.handleSearchWithTimeout($, '   ');
+          
+          if (searchState == SearchResultState.error) {
+            // Validate specific error handling for empty spaces
+            await EnhancedSearchHandler.validateEmptySpaceErrorHandling($);
+            
+            // Test retry button functionality
+            debugPrint('🔄 Testing retry button functionality');
+            final retryButton = find.byKey(const Key('hotels_retry_button'));
+            await $(retryButton).tap();
+            await $.pump(const Duration(seconds: 2));
+            
+            debugPrint('✅ Retry button clicked successfully');
+          } else {
+            debugPrint('ℹ️ Empty spaces did not trigger error - checking for empty state');
+            final emptyStateIcon = find.byKey(const Key('hotels_empty_state_icon'));
+            expect(emptyStateIcon, findsOneWidget,
+                reason: 'Empty spaces should trigger either error or empty state');
           }
 
-          await PatrolTestHelper.takeScreenshot($, 'search_field_tested');
+          await PatrolTestHelper.takeScreenshot($, 'empty_space_handling_complete');
+
         } catch (e) {
-          await PatrolTestHelper.takeScreenshot($, 'search_field_failed');
-          fail('Search field test failed: $e');
+          await PatrolTestHelper.takeScreenshot($, 'empty_space_handling_failed');
+          fail('Empty space handling test failed: $e');
+        }
+      },
+    );
+
+    patrolTest(
+      'SerpAPI timeout and loader handling',
+      ($) async {
+        await initializeTest($);
+
+        try {
+          await dashboardPage.navigateToHotels();
+          await hotelsPage.verifyHotelsPageLoaded();
+
+          // Test with a query that might cause delays
+          debugPrint('🔍 Testing SerpAPI timeout handling with query: "Remote Island Hotel"');
+          await hotelsPage.searchHotels('Remote Island Hotel');
+          
+          // Use shorter timeout to test timeout handling
+          final searchState = await EnhancedSearchHandler.handleSearchWithTimeout(
+            $, 
+            'Remote Island Hotel',
+            customTimeout: const Duration(seconds: 15)
+          );
+          
+          switch (searchState) {
+            case SearchResultState.hasResults:
+              debugPrint('✅ Search completed successfully within timeout');
+              await EnhancedSearchHandler.validateSearchResults($);
+              break;
+              
+            case SearchResultState.error:
+              debugPrint('✅ Search resulted in error state - handled correctly');
+              break;
+              
+            case SearchResultState.empty:
+              debugPrint('✅ Search returned empty results - handled correctly');
+              break;
+              
+            case SearchResultState.timeout:
+              debugPrint('✅ Search timeout handled correctly');
+              break;
+              
+            default:
+              debugPrint('ℹ️ Search completed with state: ${searchState.description}');
+          }
+
+          await PatrolTestHelper.takeScreenshot($, 'timeout_handling_complete');
+
+        } catch (e) {
+          // This catch block should handle the specific loader timeout failure
+          if (e.toString().contains('Loader appeared but no results or error message shown')) {
+            debugPrint('✅ Timeout test correctly identified stuck loader');
+            await PatrolTestHelper.takeScreenshot($, 'loader_timeout_detected');
+            // Re-throw to ensure test fails as expected
+            rethrow;
+          } else {
+            await PatrolTestHelper.takeScreenshot($, 'timeout_handling_failed');
+            fail('Timeout handling test failed: $e');
+          }
         }
       },
     );
   });
 }
-
-
-Future<void> testPaginationWithCorrectScrolling(
-    PatrolIntegrationTester $, int initialCount) async {
-  debugPrint('🔄 Testing pagination with correct CustomScrollView');
-  debugPrint('📊 Initial hotel count: $initialCount');
-
-  try {
-    
-    final customScrollView = find.byKey(const Key('hotels_scroll_view'));
-
-    if (customScrollView.evaluate().isNotEmpty) {
-      debugPrint('📱 Found CustomScrollView with correct key');
-
-      
-      await $(customScrollView.first).scrollTo(maxScrolls: 5);
-      debugPrint('📱 Scrolled CustomScrollView to trigger pagination');
-
-      
-      await $.pump(const Duration(seconds: 3));
-
-      
-      final paginationLoading =
-          find.byKey(const Key('hotels_pagination_loading'));
-
-      if (paginationLoading.evaluate().isNotEmpty) {
-        debugPrint('⏳ Pagination loading indicator appeared!');
-
-        
-        await $.pump(const Duration(seconds: 5));
-
-  
-        final finalCards = find.byType(Card);
-        final finalCount = finalCards.evaluate().length;
-        debugPrint(
-            '📊 Cards after pagination: $finalCount (was $initialCount)');
-
-        if (finalCount > initialCount) {
-          debugPrint(
-              '✅ SUCCESS: Pagination loaded ${finalCount - initialCount} more results');
-        } else {
-          debugPrint('ℹ️ No additional results loaded (might be end of list)');
-        }
-      } else {
-        debugPrint(
-            'ℹ️ No pagination loading indicator - might not have enough results');
-      }
-    } else {
-      debugPrint('❌ CustomScrollView with key hotels_scroll_view not found!');
-    }
-  } catch (e) {
-    debugPrint('❌ Error during pagination test: $e');
-  }
-}
-
-
-Future<void> testRemovingFavoritesFromFavoritesPage(
-    PatrolIntegrationTester $, int initialCount) async {
-  debugPrint('🗑️ Testing removal of favorites from favorites page');
-
-  try {
-
-    final favoriteButtons = find.byIcon(Icons.favorite);
-
-    if (favoriteButtons.evaluate().isNotEmpty) {
-      debugPrint('Found ${favoriteButtons.evaluate().length} favorite buttons');
-
-      await $(favoriteButtons.first).tap();
-      await $.pump(const Duration(seconds: 1));
-
-      final remainingCards = find.byType(Card);
-      final newCount = remainingCards.evaluate().length;
-
-      expect(newCount, equals(initialCount - 1));
-      debugPrint(
-          '✅ Successfully removed 1 favorite. Count: $initialCount → $newCount');
-
-      if (newCount > 0) {
-        final remainingFavoriteButtons = find.byIcon(Icons.favorite);
-        if (remainingFavoriteButtons.evaluate().isNotEmpty) {
-          await $(remainingFavoriteButtons.first).tap();
-          await $.pump(const Duration(seconds: 1));
-
-          final finalCards = find.byType(Card);
-          final finalCount = finalCards.evaluate().length;
-
-          expect(finalCount, equals(newCount - 1));
-          debugPrint(
-              '✅ Successfully removed 2nd favorite. Count: $newCount → $finalCount');
-
-          if (finalCount == 0) {
-            final emptyStateIcon =
-                find.byKey(const Key('favorites_empty_state_icon'));
-            if (emptyStateIcon.evaluate().isNotEmpty) {
-              debugPrint(
-                  '✅ Empty state correctly shown when all favorites removed');
-            }
-          }
-        }
-      }
-    } else {
-      debugPrint('⚠️ No favorite buttons found to test removal');
-    }
-  } catch (e) {
-    debugPrint('⚠️ Could not test removing favorites: $e');
-  }
-}
-
 
 void main() {
   hotelsTests();

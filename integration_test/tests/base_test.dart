@@ -3,10 +3,10 @@ import 'package:patrol/patrol.dart';
 
 import '../helpers/test_helper.dart';
 import '../page_objects/dashboard_page.dart';
-import '../page_objects/overview_page.dart';
+import '../../__backup/overview_page.dart';
 import '../page_objects/hotels_page.dart';
 import '../page_objects/favorites_page.dart';
-import '../page_objects/account_page.dart';
+import '../../__backup/account_page.dart';
 
 class BaseTestHelper {
   static late DashboardPage dashboardPage;

@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:patrol/patrol.dart';
-import 'base_page.dart';
-import '../locators/app_locators.dart';
+import '../integration_test/page_objects/base_page.dart';
+import '../integration_test/locators/app_locators.dart';
 
 class OverviewPage extends BasePage {
   OverviewPage(PatrolIntegrationTester $) : super($);

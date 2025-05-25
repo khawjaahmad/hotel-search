@@ -4,10 +4,10 @@ import 'package:patrol/patrol.dart';
 import 'helpers/test_helper.dart';
 import 'locators/app_locators.dart';
 import 'page_objects/dashboard_page.dart';
-import 'page_objects/overview_page.dart';
+import '../__backup/overview_page.dart';
 import 'page_objects/hotels_page.dart';
 import 'page_objects/favorites_page.dart';
-import 'page_objects/account_page.dart';
+import '../__backup/account_page.dart';
 
 
 void main() {

@@ -1,12 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:patrol/patrol.dart';
 
-import '../helpers/test_helper.dart';
-import '../page_objects/dashboard_page.dart';
-import '../page_objects/overview_page.dart';
-import '../page_objects/hotels_page.dart';
-import '../page_objects/favorites_page.dart';
-import '../page_objects/account_page.dart';
+import '../integration_test/helpers/test_helper.dart';
+import '../integration_test/page_objects/dashboard_page.dart';
+import 'overview_page.dart';
+import '../integration_test/page_objects/hotels_page.dart';
+import '../integration_test/page_objects/favorites_page.dart';
+import 'account_page.dart';
 
 void appLaunchTests() {
   group('App Launch Tests', () {

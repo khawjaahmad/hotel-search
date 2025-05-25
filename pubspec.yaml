@@ -15,6 +15,7 @@ dependencies:
   envied: ^1.0.0
   equatable: ^2.0.7
   flutter_bloc: ^8.1.6
+  bloc_test: ^9.1.5
   get_it: ^8.0.3
   hive: ^4.0.0-dev.2
   http: ^1.2.2
@@ -34,10 +35,13 @@ dev_dependencies:
   auto_route_generator: ^9.0.0
   envied_generator: ^1.0.0
   injectable_generator: ^2.6.2
+  mocktail: ^1.0.1
   json_serializable: ^6.9.0
   slang_build_runner: ^4.4.0
   analyzer: ^6.11.0
   patrol: ^3.15.2
+  golden_toolkit: ^0.15.0
+  mockito: ^5.4.2
   integration_test:
     sdk: flutter
 
