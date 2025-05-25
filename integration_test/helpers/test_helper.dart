@@ -42,11 +42,11 @@ class PatrolTestHelper {
   static Future<void> waitForWidget(
     PatrolIntegrationTester $,
     Finder finder, {
-    Duration timeout = defaultTimeout,
+    Duration timeout = const Duration(seconds: 10),
     String? description,
   }) async {
     try {
-      await $.waitUntilVisible(finder, timeout: timeout);
+      await $.pumpUntilFound(finder, timeout: timeout);
       debugPrint('✅ Widget found: ${description ?? finder.toString()}');
     } catch (e) {
       debugPrint(
@@ -198,5 +198,80 @@ class PatrolTestHelper {
   static void resetAppInitialization() {
     _isAppInitialized = false;
     debugPrint('🔄 App initialization state reset');
+  }
+
+  static Future<void> clearTextByKey(PatrolIntegrationTester $, String key, {String? description}) async {
+    await $(find.byKey(Key(key))).enterText('');
+  }
+
+  static void verifyWidgetNotExists(String key, {String? description}) {
+    expect(find.byKey(Key(key)), findsNothing);
+  }
+
+  static void verifyMultipleWidgetsExist(List<String> keys) {
+    for (final key in keys) {
+      expect(find.byKey(Key(key)), findsOneWidget);
+    }
+  }
+
+  static Future<void> waitForWidgetToDisappear(
+    PatrolIntegrationTester $,
+    Finder finder, {
+    Duration timeout = const Duration(seconds: 10),
+    String? description,
+  }) async {
+    bool isFound = true;
+    final stopwatch = Stopwatch()..start();
+
+    while (isFound && stopwatch.elapsed < timeout) {
+      await $.pump(const Duration(milliseconds: 100));
+      try {
+        await $(finder).waitUntilVisible();
+        isFound = true;
+      } catch (e) {
+        isFound = false;
+      }
+    }
+
+    if (isFound) {
+      throw Exception('Widget ${description ?? finder.toString()} did not disappear within $timeout');
+    }
+  }
+
+  static Future<void> waitForMultipleWidgets(
+    PatrolIntegrationTester $,
+    List<String> keys, {
+    Duration timeout = const Duration(seconds: 10),
+  }) async {
+    for (final key in keys) {
+      await waitForWidget($, find.byKey(Key(key)), timeout: timeout);
+    }
+  }
+
+  static Future<void> scrollUntilVisible(
+    PatrolIntegrationTester $,
+    String scrollableKey,
+    String targetKey, {
+    double delta = 100,
+    int maxScrolls = 10,
+    String? description,
+  }) async {
+    final scrollable = find.byKey(Key(scrollableKey));
+    final target = find.byKey(Key(targetKey));
+    
+    for (int i = 0; i < maxScrolls; i++) {
+      if (await isWidgetVisible(targetKey)) {
+        return;
+      }
+      
+      // Use drag instead of scroll
+      await $(scrollable).dragTo(
+        dy: -delta, // Negative for upward scroll
+        duration: const Duration(milliseconds: 300),
+      );
+      await $.pump(const Duration(milliseconds: 300));
+    }
+    
+    throw Exception('Could not make target element visible after $maxScrolls scrolls');
   }
 }

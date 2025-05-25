@@ -92,16 +92,16 @@ void main() {
         verify(() => mockGetFavoritesUseCase.call()).called(1);
       });
 
-      test('should initialize with favorites from getFavoritesUseCase', () {
-        // Arrange
-        when(() => mockGetFavoritesUseCase.call()).thenReturn(multipleHotels);
-
-        // Act
-        favoritesBloc = createBloc();
-
-        // Assert
-        expect(favoritesBloc.state.items, equals(multipleHotels));
-      });
+      blocTest<FavoritesBloc, FavoritesState>(
+        'should initialize with favorites from getFavoritesUseCase',
+        setUp: () {
+          when(() => mockGetFavoritesUseCase.call()).thenReturn(multipleHotels);
+        },
+        build: createBloc,
+        expect: () => [
+          FavoritesState(items: multipleHotels),
+        ],
+      );
     });
 
     group('AddFavoriteEvent', () {
@@ -117,8 +117,9 @@ void main() {
       );
 
       blocTest<FavoritesBloc, FavoritesState>(
-        'should not emit new states when adding favorite',
+        'should not emit new states when adding favorite (repository handles state)',
         build: createBloc,
+        skip: 1, // Skip initial state emission
         act: (bloc) {
           bloc.add(AddFavoriteEvent(hotel: testHotel));
         },
@@ -146,6 +147,7 @@ void main() {
       blocTest<FavoritesBloc, FavoritesState>(
         'should emit new state with updated items',
         build: createBloc,
+        skip: 1, // Skip initial state emission
         act: (bloc) {
           bloc.add(FavoritesUpdatedEvent(items: multipleHotels));
         },

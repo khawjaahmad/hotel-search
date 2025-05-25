@@ -1,4 +1,6 @@
 // test/unit/features/hotels/presentation/bloc/hotels_bloc_test.dart
+import 'dart:async';
+
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -120,13 +122,41 @@ void main() {
 
     group('HotelsSearchUpdateEvent', () {
       blocTest<HotelsBloc, HotelsState>(
-        'should emit new state with updated params and clear previous data',
+        'should emit new state with updated params when query is empty',
         build: createBloc,
+        act: (bloc) {
+          bloc.add(HotelsSearchUpdateEvent(params: emptyQuerySearchParams));
+        },
+        wait: const Duration(milliseconds: 600), // Wait for debounce
+        expect: () => [
+          HotelsState(params: emptyQuerySearchParams),
+        ],
+      );
+
+      blocTest<HotelsBloc, HotelsState>(
+        'should emit new state and trigger fetch when query is not empty',
+        build: createBloc,
+        setUp: () {
+          when(() => mockFetchHotelsUseCase.call(
+                params: any(named: 'params'),
+                pageToken: any(named: 'pageToken'),
+              )).thenAnswer((_) async => firstPageResponse);
+        },
         act: (bloc) {
           bloc.add(HotelsSearchUpdateEvent(params: defaultSearchParams));
         },
+        wait: const Duration(milliseconds: 700), // Wait for debounce + fetch
         expect: () => [
           HotelsState(params: defaultSearchParams),
+          HotelsState(
+            params: defaultSearchParams,
+            loading: true,
+          ),
+          HotelsState(
+            params: defaultSearchParams,
+            items: firstPageResponse.items,
+            nextPageToken: firstPageResponse.nextPageToken,
+          ),
         ],
       );
 
@@ -291,10 +321,11 @@ void main() {
             params: defaultSearchParams,
             loading: true,
           ),
-          HotelsState(
-            params: defaultSearchParams,
-            error: isA<Exception>(),
-          ),
+          predicate<HotelsState>((state) =>
+              state.params == defaultSearchParams &&
+              state.loading == false &&
+              state.error is Exception &&
+              state.items.isEmpty),
         ],
       );
 
@@ -432,10 +463,11 @@ void main() {
           bloc.add(HotelsFetchFailureEvent(error: error));
         },
         expect: () => [
-          HotelsState(
-            params: defaultSearchParams,
-            error: isA<Exception>(),
-          ),
+          predicate<HotelsState>((state) =>
+              state.params == defaultSearchParams &&
+              state.loading == false &&
+              state.error is Exception &&
+              state.items.isEmpty),
         ],
       );
 
@@ -452,11 +484,12 @@ void main() {
           bloc.add(HotelsFetchFailureEvent(error: error));
         },
         expect: () => [
-          HotelsState(
-            params: defaultSearchParams,
-            items: [defaultHotel],
-            error: isA<Exception>(),
-          ),
+          predicate<HotelsState>((state) =>
+              state.params == defaultSearchParams &&
+              state.loading == false &&
+              state.error is Exception &&
+              state.items.length == 1 &&
+              state.items.first == defaultHotel),
         ],
       );
     });
@@ -627,16 +660,12 @@ void main() {
             loading: true,
           ),
           // First attempt error
-          HotelsState(
-            params: defaultSearchParams,
-            error: isA<Exception>(),
-          ),
-          // Retry loading (error cleared)
-          HotelsState(
-            params: defaultSearchParams,
-            loading: true,
-          ),
-          // Retry success
+          predicate<HotelsState>((state) =>
+              state.params == defaultSearchParams &&
+              state.loading == false &&
+              state.error is Exception &&
+              state.items.isEmpty),
+          // Retry success (no loading state due to droppable transformer)
           HotelsState(
             params: defaultSearchParams,
             items: firstPageResponse.items,

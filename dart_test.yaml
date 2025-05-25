@@ -1,0 +1,21 @@
+test_on: vm
+platforms: [vm]
+
+# Configure test reporter
+reporters:
+  - json
+
+# Test configuration
+timeout: 30s
+chain_stack_traces: true
+reporter: expanded
+
+# Coverage configuration  
+coverage:
+  package_filters:
+    - hotel_booking
+  skip_files:
+    - "*.g.dart"
+    - "*.freezed.dart" 
+    - "**/generated/**"
+    - "**/l10n/**"
