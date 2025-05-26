@@ -1,5 +1,5 @@
-# Device Configuration for Patrol Tests
-# Supports local emulators/simulators and cloud devices (Firebase Test Lab, etc.)
+# Device Configuration for Hotel Booking App Tests
+# Configured for your specific available devices
 
 environments:
   local:
@@ -11,25 +11,19 @@ environments:
         runtime: "iOS-18-0"
         device_type: "com.apple.CoreSimulator.SimDeviceType.iPhone-16-Plus"
         status: "booted"
+        description: "Primary iOS test device"
     
     android_emulators:
       pixel_7:
         name: "Pixel 7"
-        avd_name: "Pixel_7_API_36"
+        avd_name: "Pixel_7"
         api_level: 36
         target: "android-36"
-        abi: "arm64"
-        port: "5554"
-        description: "Android 16.0 (Baklava) | arm64"
-        
-      pixel_9_pro_xl:
-        name: "Pixel 9 Pro XL"
-        avd_name: "Pixel_9_Pro_XL_API_36"
-        api_level: 36
-        target: "android-36"
-        abi: "arm64"
-        port: "5556"
-        description: "Android 16.0 (Baklava) | arm64"
+        abi: "arm64-v8a"
+        tag: "google_apis_playstore"
+        description: "Android 14.0 (API 36) | arm64-v8a | Google Play"
+        ram_size: "2048"
+        heap_size: "228"
 
   firebase_test_lab:
     ios_devices:
@@ -40,6 +34,7 @@ environments:
         locale: "en"
         orientation: "portrait"
         device_capacity: "Medium"
+        description: "Firebase Test Lab iOS device"
     
     android_devices:
       pixel_8:
@@ -49,8 +44,8 @@ environments:
         locale: "en"
         orientation: "portrait"
         device_capacity: "High"
+        description: "Firebase Test Lab Android device"
 
-# Test execution configuration
 execution:
   default_platform: "local"
   parallel_execution: true
@@ -59,39 +54,8 @@ execution:
   test_timeout: 600
   retry_count: 2
   
-  # Device selection strategy
-  device_selection:
-    strategy: "available_first"  # available_first, round_robin, specific
-    fallback_enabled: true
-    auto_create_missing: false  # Don't auto-create since we have specific devices
-    
-  # Preferred devices for different scenarios
   preferred_devices:
     local_ios: "iphone_16_plus"
     local_android: "pixel_7"
     firebase_ios: "iphone_15_pro"
     firebase_android: "pixel_8"
-
-# Device health checks
-health_checks:
-  enabled: true
-  pre_test_checks:
-    - device_online
-    - sufficient_storage
-    - app_installation
-  post_test_cleanup:
-    - clear_app_data
-    - reset_permissions
-    - capture_logs
-
-# Environment-specific settings
-firebase_test_lab:
-  project_id: "your-firebase-project-id"  # Replace with your project ID
-  results_bucket: "your-results-bucket"   # Replace with your bucket name
-  timeout: "15m"
-  
-local_testing:
-  auto_boot_devices: true
-  screenshot_on_failure: true
-  video_recording: false
-  performance_monitoring: true

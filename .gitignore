@@ -130,6 +130,10 @@ screenshots/
 allure/
 allure-report/
 allure-results/
+test-output/
+test-reports/
+test-results/
+test_results/
 
 # Symbolication and obfuscation
 app.*.symbols
@@ -144,3 +148,14 @@ package.json
 Makefile
 README.md
 testing-strategy.md
+# Test artifacts
+allure-results/
+allure-report/
+test-results/
+coverage/
+node_modules/
+*.log
+
+# Temporary files
+.DS_Store
+Thumbs.db

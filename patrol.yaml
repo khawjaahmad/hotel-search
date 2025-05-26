@@ -1,0 +1,84 @@
+# patrol.yaml - Patrol Configuration for Hotel Booking App
+# This file configures Patrol for proper integration test execution
+
+patrol:
+  app_name: Hotel Booking
+  
+  android:
+    package_name: com.example.hotel_booking
+    
+  ios:
+    bundle_id: com.ahmadwaqar.hotelBooking
+
+# Test configuration
+test:
+  timeout: 600  # 10 minutes timeout for tests
+  retry_count: 2
+  
+  # Environment variables passed to tests
+  environment:
+    PATROL_WAIT: "5000"
+    ALLURE_RESULTS_DIRECTORY: "allure-results"
+    INTEGRATION_TEST_SCREENSHOTS: "screenshots"
+    
+  # Test execution settings
+  execution:
+    parallel_enabled: true
+    max_parallel_tests: 4
+    screenshot_on_failure: true
+    video_recording: false
+
+# Device configurations
+devices:
+  local:
+    ios:
+      - name: "iPhone 16 Plus"
+        udid: "AEEFBF8D-12AB-4AC1-9BA7-9751ED8AC5D8"
+        version: "18.4"
+        preferred: true
+        
+    android:
+      - name: "Pixel_7"
+        avd_name: "Pixel_7"
+        api_level: 34
+        preferred: true
+        
+  firebase:
+    project_id: "your-firebase-project-id"  # Replace with your project ID
+    
+    ios:
+      - model: "iphone15pro"
+        version: "18.0"
+        locale: "en"
+        orientation: "portrait"
+        
+    android:
+      - model: "shiba"  # Pixel 8
+        version: "34"
+        locale: "en"
+        orientation: "portrait"
+
+# Reporting configuration
+reporting:
+  allure:
+    enabled: true
+    results_directory: "allure-results"
+    report_directory: "allure-report"
+    
+  screenshots:
+    enabled: true
+    directory: "screenshots"
+    on_failure: true
+    on_success: false
+    
+  logs:
+    enabled: true
+    directory: "test-results/logs"
+    level: "info"
+
+# Integration test files
+tests:
+  - "integration_test/tests/hotels_test.dart"
+  - "integration_test/tests/overview_test.dart"
+  - "integration_test/tests/account_test.dart"
+  - "integration_test/tests/dashboard_test.dart"
