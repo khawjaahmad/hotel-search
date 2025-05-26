@@ -8,10 +8,10 @@ import 'reports/allure_reporter.dart';
 import 'locators/app_locators.dart';
 import 'logger/test_logger.dart';
 
-import 'tests/overview_page_test.dart' as overview_tests;
+import 'tests/overview_test.dart' as overview_tests;
 import 'tests/account_test.dart' as account_tests;
 import 'tests/dashboard_test.dart' as dashboard_tests;
-import 'tests/hotels_page_test.dart' as hotels_tests;
+import 'tests/hotels_test.dart' as hotels_tests;
 
 void main() {
   group('Hotel Booking App - Complete Integration Test Suite', () {

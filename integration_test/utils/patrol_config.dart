@@ -6,6 +6,7 @@ class PatrolConfig {
       existsTimeout: const Duration(seconds: 30),
       visibleTimeout: const Duration(seconds: 30),
       settleTimeout: const Duration(seconds: 30),
+      printLogs: true, 
     );
   }
 }

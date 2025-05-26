@@ -1,0 +1,365 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+env:
+  FLUTTER_VERSION: '3.19.0'
+  JAVA_VERSION: '17'
+  XCODE_VERSION: '15.2'
+
+jobs:
+  # =============================================================================
+  # iOS Integration Tests
+  # =============================================================================
+  ios-tests:
+    name: iOS Integration Tests
+    runs-on: macos-14
+    timeout-minutes: 45
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+          
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'stable'
+          cache: true
+          
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: ${{ env.XCODE_VERSION }}
+          
+      - name: Cache Flutter dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-flutter-${{ hashFiles('**/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-flutter-
+            
+      - name: Install dependencies
+        run: |
+          flutter clean
+          flutter pub get
+          
+      - name: Setup iOS Simulator
+        run: |
+          # List available simulators
+          xcrun simctl list devices
+          
+          # Boot iPhone 15 Pro simulator
+          DEVICE_ID=$(xcrun simctl list devices | grep "iPhone 15 Pro" | grep -v "unavailable" | head -1 | grep -o "[0-9A-F-]\{36\}")
+          echo "DEVICE_ID=$DEVICE_ID" >> $GITHUB_ENV
+          
+          xcrun simctl boot "$DEVICE_ID"
+          xcrun simctl list devices | grep "$DEVICE_ID"
+          
+      - name: Install Patrol CLI
+        run: |
+          dart pub global activate patrol_cli
+          echo "$HOME/.pub-cache/bin" >> $GITHUB_PATH
+          
+      - name: Run iOS Integration Tests
+        run: |
+          # Run tests with coverage and Allure reporting
+          patrol test integration_test/app_test.dart \
+            --tags ios \
+            --device-id "$DEVICE_ID" \
+            --coverage \
+            --dart-define ALLURE_ENABLED=true \
+            --timeout 600 \
+            --retry 2 \
+            --verbose
+            
+      - name: Generate Coverage Report
+        if: always()
+        run: |
+          if [ -f "coverage/lcov.info" ]; then
+            # Install lcov for coverage report generation
+            brew install lcov
+            genhtml coverage/lcov.info -o coverage/html
+          fi
+          
+      - name: Upload iOS Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-test-results
+          path: |
+            coverage/
+            allure-results/
+            test/
+          retention-days: 30
+          
+      - name: Upload iOS Coverage to Codecov
+        if: always()
+        uses: codecov/codecov-action@v4
+        with:
+          file: coverage/lcov.info
+          flags: ios
+          name: ios-coverage
+          fail_ci_if_error: false
+
+  # =============================================================================
+  # Android Integration Tests  
+  # =============================================================================
+  android-tests:
+    name: Android Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+          
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'stable'
+          cache: true
+          
+      - name: Cache Flutter dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-flutter-${{ hashFiles('**/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-flutter-
+            
+      - name: Install dependencies
+        run: |
+          flutter clean
+          flutter pub get
+          
+      - name: Enable KVM group permissions
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          
+      - name: Setup Android Emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: Nexus 6
+          cores: 2
+          ram-size: 4096M
+          heap-size: 512M
+          script: echo "Android emulator started"
+          
+      - name: Install Patrol CLI
+        run: |
+          dart pub global activate patrol_cli
+          echo "$HOME/.pub-cache/bin" >> $GITHUB_PATH
+          
+      - name: Wait for Android Emulator
+        run: |
+          adb wait-for-device
+          while [ "`adb shell getprop sys.boot_completed | tr -d '\r' `" != "1" ]; do sleep 1; done
+          adb devices
+          
+      - name: Run Android Integration Tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: Nexus 6
+          cores: 2
+          ram-size: 4096M
+          heap-size: 512M
+          script: |
+            # Run tests with coverage and Allure reporting
+            patrol test integration_test/app_test.dart \
+              --tags android \
+              --coverage \
+              --dart-define ALLURE_ENABLED=true \
+              --timeout 600 \
+              --retry 2 \
+              --verbose
+              
+      - name: Generate Coverage Report
+        if: always()
+        run: |
+          if [ -f "coverage/lcov.info" ]; then
+            # Install lcov for coverage report generation  
+            sudo apt-get update
+            sudo apt-get install -y lcov
+            genhtml coverage/lcov.info -o coverage/html
+          fi
+          
+      - name: Upload Android Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-test-results
+          path: |
+            coverage/
+            allure-results/
+            test/
+          retention-days: 30
+          
+      - name: Upload Android Coverage to Codecov
+        if: always()
+        uses: codecov/codecov-action@v4
+        with:
+          file: coverage/lcov.info
+          flags: android
+          name: android-coverage
+          fail_ci_if_error: false
+
+  # =============================================================================
+  # Generate Consolidated Reports
+  # =============================================================================
+  generate-reports:
+    name: Generate Consolidated Reports
+    runs-on: ubuntu-latest
+    needs: [ios-tests, android-tests]
+    if: always()
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Download iOS Test Results
+        uses: actions/download-artifact@v4
+        with:
+          name: ios-test-results
+          path: ios-results/
+          
+      - name: Download Android Test Results
+        uses: actions/download-artifact@v4
+        with:
+          name: android-test-results
+          path: android-results/
+          
+      - name: Setup Allure
+        uses: simple-elf/allure-report-action@master
+        if: always()
+        with:
+          allure_results: |
+            ios-results/allure-results
+            android-results/allure-results
+          allure_report: allure-report
+          gh_pages: allure-history
+          
+      - name: Deploy Allure Report to GitHub Pages
+        if: always() && github.ref == 'refs/heads/main'
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: allure-history
+          destination_dir: allure-report
+          
+      - name: Generate Test Summary
+        if: always()
+        run: |
+          echo "## 🧪 Integration Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # iOS Results
+          if [ -d "ios-results" ]; then
+            echo "### 📱 iOS Results" >> $GITHUB_STEP_SUMMARY
+            echo "- Device: iPhone 15 Pro Simulator" >> $GITHUB_STEP_SUMMARY
+            echo "- Status: ${{ needs.ios-tests.result }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Android Results  
+          if [ -d "android-results" ]; then
+            echo "### 🤖 Android Results" >> $GITHUB_STEP_SUMMARY
+            echo "- Device: Nexus 6 API 34 Emulator" >> $GITHUB_STEP_SUMMARY
+            echo "- Status: ${{ needs.android-tests.result }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Links
+          echo "### 📊 Reports" >> $GITHUB_STEP_SUMMARY
+          echo "- [Coverage Report](https://codecov.io/gh/${{ github.repository }})" >> $GITHUB_STEP_SUMMARY
+          echo "- [Allure Report](https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/allure-report/)" >> $GITHUB_STEP_SUMMARY
+          
+  # =============================================================================
+  # Prepare for Firebase Test Lab (triggered after successful tests)
+  # =============================================================================
+  prepare-firebase-test-lab:
+    name: Prepare Firebase Test Lab
+    runs-on: ubuntu-latest
+    needs: [ios-tests, android-tests]
+    if: success() && github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'stable'
+          cache: true
+          
+      - name: Install dependencies
+        run: |
+          flutter clean
+          flutter pub get
+          
+      - name: Build iOS Test App
+        run: |
+          cd ios
+          flutter build ios integration_test/app_test.dart --release
+          
+      - name: Build Android Test App
+        run: |
+          flutter build apk integration_test/app_test.dart --release
+          flutter build apk integration_test/app_test.dart --debug
+          
+      - name: Upload Test Apps for Firebase
+        uses: actions/upload-artifact@v4
+        with:
+          name: firebase-test-apps
+          path: |
+            build/ios/ipa/*.ipa
+            build/app/outputs/apk/debug/*.apk
+            build/app/outputs/apk/release/*.apk
+          retention-days: 7
+          
+      - name: Trigger Firebase Test Lab Workflow
+        if: success()
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          workflow: firebase-test-lab.yml
+          token: ${{ secrets.GITHUB_TOKEN }}
+          inputs: |
+            {
+              "triggered_by": "${{ github.sha }}",
+              "branch": "${{ github.ref_name }}"
+            }

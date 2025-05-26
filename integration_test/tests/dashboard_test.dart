@@ -4,10 +4,19 @@ import '../utils/test_helpers.dart';
 import '../utils/test_utils.dart';
 import '../utils/patrol_config.dart';
 import '../reports/allure_reporter.dart';
+import '../helpers/allure_helper.dart';
 import '../locators/app_locators.dart';
 
 void main() {
   group('Dashboard Feature Integration Tests', () {
+    setUpAll(() async {
+      await EnhancedAllureHelper.initialize();
+    });
+
+    tearDownAll(() async {
+      await EnhancedAllureHelper.finalize();
+    });
+
     Future<void> initializeTest(PatrolIntegrationTester $) async {
       await TestUtils.initializeAllure();
       await TestHelpers.initializeApp($);
@@ -58,30 +67,45 @@ void main() {
       'Dashboard loads with navigation tabs',
       config: PatrolConfig.getConfig(),
       ($) async {
-        AllureReporter.addLabel('feature', 'Dashboard');
-        AllureReporter.setSeverity(AllureSeverity.critical);
+        await EnhancedAllureHelper.startTest(
+          'Dashboard loads with navigation tabs',
+          description:
+              'Verify dashboard loads correctly with all navigation tabs',
+          labels: [
+            'feature:dashboard',
+            'component:navigation',
+            'priority:critical'
+          ],
+          severity: AllureSeverity.critical,
+        );
 
         try {
-          AllureReporter.reportStep('Initialize app');
+          EnhancedAllureHelper.reportStep('Initialize application');
           await initializeTest($);
-          AllureReporter.reportStep('App initialized',
-              status: AllureStepStatus.passed);
 
-          AllureReporter.reportStep('Verify dashboard scaffold');
+          EnhancedAllureHelper.reportStep(
+              'Verify dashboard scaffold structure');
           verifyDashboardStructure($);
-          AllureReporter.reportStep('Dashboard structure verified',
-              status: AllureStepStatus.passed);
 
-          AllureReporter.reportStep('Verify all navigation tabs');
+          EnhancedAllureHelper.reportStep('Verify all navigation tabs present');
           verifyAllNavigationTabs($);
-          AllureReporter.reportStep('All tabs verified',
-              status: AllureStepStatus.passed);
 
-          AllureReporter.setTestStatus(status: AllureTestStatus.passed);
+          await EnhancedAllureHelper.finishTest(
+            'Dashboard loads with navigation tabs',
+            status: AllureTestStatus.passed,
+          );
         } catch (e, stackTrace) {
-          AllureReporter.setTestStatus(
+          EnhancedAllureHelper.reportStep(
+            'Dashboard load test failed',
+            status: AllureStepStatus.failed,
+            details: e.toString(),
+          );
+
+          await EnhancedAllureHelper.finishTest(
+            'Dashboard loads with navigation tabs',
             status: AllureTestStatus.failed,
-            reason: 'Test failed: $e\nStack trace: $stackTrace',
+            errorMessage: e.toString(),
+            stackTrace: stackTrace.toString(),
           );
           rethrow;
         }
@@ -92,25 +116,41 @@ void main() {
       'Navigation between tabs works',
       config: PatrolConfig.getConfig(),
       ($) async {
-        AllureReporter.addLabel('feature', 'Dashboard Navigation');
-        AllureReporter.setSeverity(AllureSeverity.critical);
+        await EnhancedAllureHelper.startTest(
+          'Navigation between tabs works',
+          description:
+              'Verify navigation functionality between all dashboard tabs',
+          labels: [
+            'feature:dashboard',
+            'component:navigation',
+            'priority:critical'
+          ],
+          severity: AllureSeverity.critical,
+        );
 
         try {
-          AllureReporter.reportStep('Initialize app');
+          EnhancedAllureHelper.reportStep('Initialize application');
           await initializeTest($);
-          AllureReporter.reportStep('App initialized',
-              status: AllureStepStatus.passed);
 
-          AllureReporter.reportStep('Perform navigation cycle');
+          EnhancedAllureHelper.reportStep('Perform complete navigation cycle');
           await performNavigationCycle($);
-          AllureReporter.reportStep('Navigation cycle completed',
-              status: AllureStepStatus.passed);
 
-          AllureReporter.setTestStatus(status: AllureTestStatus.passed);
+          await EnhancedAllureHelper.finishTest(
+            'Navigation between tabs works',
+            status: AllureTestStatus.passed,
+          );
         } catch (e, stackTrace) {
-          AllureReporter.setTestStatus(
+          EnhancedAllureHelper.reportStep(
+            'Navigation cycle test failed',
+            status: AllureStepStatus.failed,
+            details: e.toString(),
+          );
+
+          await EnhancedAllureHelper.finishTest(
+            'Navigation between tabs works',
             status: AllureTestStatus.failed,
-            reason: 'Test failed: $e\nStack trace: $stackTrace',
+            errorMessage: e.toString(),
+            stackTrace: stackTrace.toString(),
           );
           rethrow;
         }

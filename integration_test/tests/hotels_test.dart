@@ -4,11 +4,20 @@ import '../utils/test_helpers.dart';
 import '../utils/test_utils.dart';
 import '../utils/patrol_config.dart';
 import '../reports/allure_reporter.dart';
+import '../helpers/allure_helper.dart';
 import '../logger/test_logger.dart';
 import '../utils/test_actions.dart';
 
 void main() {
   group('Hotels Feature Integration Tests', () {
+    setUpAll(() async {
+      await EnhancedAllureHelper.initialize();
+    });
+
+    tearDownAll(() async {
+      await EnhancedAllureHelper.finalize();
+    });
+
     Future<void> initializeTest(PatrolIntegrationTester $) async {
       await TestUtils.initializeAllure();
       await TestHelpers.initializeApp($);
@@ -23,33 +32,41 @@ void main() {
       'Cold start shows empty search',
       config: PatrolConfig.getConfig(),
       ($) async {
-        AllureReporter.addLabel('feature', 'Hotels Page');
-        AllureReporter.setSeverity(AllureSeverity.critical);
+        await EnhancedAllureHelper.startTest(
+          'Cold start shows empty search',
+          description: 'Verify hotels page loads with empty search field on cold start',
+          labels: ['feature:hotels', 'component:initial_state', 'priority:critical'],
+          severity: AllureSeverity.critical,
+        );
 
         try {
-          AllureReporter.reportStep('Initialize app for cold start');
+          EnhancedAllureHelper.reportStep('Initialize app for cold start');
           await initializeTest($);
-          AllureReporter.reportStep('App initialized',
-              status: AllureStepStatus.passed);
 
-          AllureReporter.reportStep('Navigate to Hotels page');
+          EnhancedAllureHelper.reportStep('Navigate to Hotels page');
           await navigateToHotels($);
-          AllureReporter.reportStep('Navigation completed',
-              status: AllureStepStatus.passed);
 
-          AllureReporter.reportStep(
-              'Verify hotels page and empty search field');
+          EnhancedAllureHelper.reportStep('Verify hotels page and empty search field');
           TestActions.verifyHotelsPageElements($);
           TestActions.verifySearchFieldState($, shouldBeEmpty: true);
           TestActions.verifyEmptyState($);
-          AllureReporter.reportStep('Hotels page verified',
-              status: AllureStepStatus.passed);
 
-          AllureReporter.setTestStatus(status: AllureTestStatus.passed);
+          await EnhancedAllureHelper.finishTest(
+            'Cold start shows empty search',
+            status: AllureTestStatus.passed,
+          );
         } catch (e, stackTrace) {
-          AllureReporter.setTestStatus(
+          EnhancedAllureHelper.reportStep(
+            'Cold start test failed',
+            status: AllureStepStatus.failed,
+            details: e.toString(),
+          );
+
+          await EnhancedAllureHelper.finishTest(
+            'Cold start shows empty search',
             status: AllureTestStatus.failed,
-            reason: 'Test failed: $e\nStack trace: $stackTrace',
+            errorMessage: e.toString(),
+            stackTrace: stackTrace.toString(),
           );
           rethrow;
         }
@@ -60,23 +77,22 @@ void main() {
       'Search returns results',
       config: PatrolConfig.getConfig(),
       ($) async {
-        AllureReporter.addLabel('feature', 'Hotels Search');
-        AllureReporter.setSeverity(AllureSeverity.critical);
+        await EnhancedAllureHelper.startTest(
+          'Search returns results',
+          description: 'Verify search functionality returns appropriate results for valid input',
+          labels: ['feature:hotels', 'component:search', 'priority:critical'],
+          severity: AllureSeverity.critical,
+        );
 
         try {
-          AllureReporter.reportStep('Initialize app');
+          EnhancedAllureHelper.reportStep('Initialize application');
           await initializeTest($);
           await navigateToHotels($);
-          AllureReporter.reportStep('App initialized',
-              status: AllureStepStatus.passed);
 
-          AllureReporter.reportStep('Enter search query');
+          EnhancedAllureHelper.reportStep('Execute search query');
           final searchState = await TestActions.performSearch($, 'Dubai');
-          AllureReporter.reportStep('Search executed',
-              status: AllureStepStatus.passed);
 
-          AllureReporter.reportStep(
-              'Verify search results - ANY input should return output');
+          EnhancedAllureHelper.reportStep('Verify search results - ANY input should return output');
           expect(searchState, isNot(SearchState.timeout),
               reason: 'Any input should produce some output');
 
@@ -85,31 +101,42 @@ void main() {
               final cardCount = TestActions.getHotelCardCount();
               TestLogger.log('Found $cardCount hotel cards');
               TestActions.verifySearchResults($);
-              AllureReporter.reportStep('Hotel cards found: $cardCount',
-                  status: AllureStepStatus.passed);
+              EnhancedAllureHelper.reportStep(
+                'Search completed with results',
+                details: 'Hotel cards found: $cardCount',
+              );
               break;
             case SearchState.hasError:
               TestLogger.log('Search resulted in error state');
               TestActions.verifyErrorState($);
-              AllureReporter.reportStep('Error state detected',
-                  status: AllureStepStatus.passed);
+              EnhancedAllureHelper.reportStep('Error state detected and verified');
               break;
             case SearchState.isEmpty:
               TestLogger.log('Search resulted in empty state');
               TestActions.verifyEmptyState($);
-              AllureReporter.reportStep('Empty state detected',
-                  status: AllureStepStatus.passed);
+              EnhancedAllureHelper.reportStep('Empty state detected and verified');
               break;
             case SearchState.timeout:
               throw Exception(
                   'Search timed out - this violates the "any input should return output" requirement');
           }
 
-          AllureReporter.setTestStatus(status: AllureTestStatus.passed);
+          await EnhancedAllureHelper.finishTest(
+            'Search returns results',
+            status: AllureTestStatus.passed,
+          );
         } catch (e, stackTrace) {
-          AllureReporter.setTestStatus(
+          EnhancedAllureHelper.reportStep(
+            'Search test execution failed',
+            status: AllureStepStatus.failed,
+            details: e.toString(),
+          );
+
+          await EnhancedAllureHelper.finishTest(
+            'Search returns results',
             status: AllureTestStatus.failed,
-            reason: 'Test failed: $e\nStack trace: $stackTrace',
+            errorMessage: e.toString(),
+            stackTrace: stackTrace.toString(),
           );
           rethrow;
         }
@@ -120,38 +147,44 @@ void main() {
       'Empty spaces trigger "Something went wrong" error',
       config: PatrolConfig.getConfig(),
       ($) async {
-        AllureReporter.addLabel('feature', 'Hotels Search');
-        AllureReporter.setSeverity(AllureSeverity.critical);
+        await EnhancedAllureHelper.startTest(
+          'Empty spaces trigger "Something went wrong" error',
+          description: 'Verify empty spaces input triggers appropriate error handling',
+          labels: ['feature:hotels', 'component:error_handling', 'priority:critical'],
+          severity: AllureSeverity.critical,
+        );
 
         try {
-          AllureReporter.reportStep('Initialize app');
+          EnhancedAllureHelper.reportStep('Initialize application');
           await initializeTest($);
           await navigateToHotels($);
-          AllureReporter.reportStep('App initialized',
-              status: AllureStepStatus.passed);
 
-          AllureReporter.reportStep(
-              'Test with empty spaces - should trigger "Something went wrong"');
+          EnhancedAllureHelper.reportStep('Test with empty spaces - should trigger "Something went wrong"');
           final searchState = await TestActions.performSearch($, '   ');
-          AllureReporter.reportStep('Search with spaces executed',
-              status: AllureStepStatus.passed);
 
-          AllureReporter.reportStep('Verify empty spaces behavior');
+          EnhancedAllureHelper.reportStep('Verify empty spaces behavior');
           expect(searchState, equals(SearchState.hasError),
-              reason:
-                  'Empty spaces should trigger "Something went wrong" error');
+              reason: 'Empty spaces should trigger "Something went wrong" error');
 
           TestActions.verifyErrorState($);
-          TestLogger.log(
-              'Empty spaces correctly triggered "Something went wrong" error');
-          AllureReporter.reportStep('Empty spaces triggered correct error',
-              status: AllureStepStatus.passed);
+          TestLogger.log('Empty spaces correctly triggered "Something went wrong" error');
 
-          AllureReporter.setTestStatus(status: AllureTestStatus.passed);
+          await EnhancedAllureHelper.finishTest(
+            'Empty spaces trigger "Something went wrong" error',
+            status: AllureTestStatus.passed,
+          );
         } catch (e, stackTrace) {
-          AllureReporter.setTestStatus(
+          EnhancedAllureHelper.reportStep(
+            'Empty spaces error test failed',
+            status: AllureStepStatus.failed,
+            details: e.toString(),
+          );
+
+          await EnhancedAllureHelper.finishTest(
+            'Empty spaces trigger "Something went wrong" error',
             status: AllureTestStatus.failed,
-            reason: 'Test failed: $e\nStack trace: $stackTrace',
+            errorMessage: e.toString(),
+            stackTrace: stackTrace.toString(),
           );
           rethrow;
         }
@@ -162,49 +195,45 @@ void main() {
       'Add hotels to favorites and verify in favorites page',
       config: PatrolConfig.getConfig(),
       ($) async {
-        AllureReporter.addLabel('feature', 'Hotels Favorites');
-        AllureReporter.setSeverity(AllureSeverity.critical);
+        await EnhancedAllureHelper.startTest(
+          'Add hotels to favorites and verify in favorites page',
+          description: 'Complete workflow test for adding and removing hotels from favorites',
+          labels: ['feature:hotels', 'component:favorites', 'priority:critical'],
+          severity: AllureSeverity.critical,
+        );
 
         try {
-          AllureReporter.reportStep('Initialize app');
+          EnhancedAllureHelper.reportStep('Initialize application');
           await initializeTest($);
           await navigateToHotels($);
-          AllureReporter.reportStep('App initialized',
-              status: AllureStepStatus.passed);
 
-          AllureReporter.reportStep('Clear any existing favorites first');
+          EnhancedAllureHelper.reportStep('Clear any existing favorites first');
           await TestHelpers.navigateToPage($, 'favorites');
           await $.pump(const Duration(seconds: 1));
 
           final existingCards = TestActions.getHotelCardCount();
           if (existingCards > 0) {
-            AllureReporter.reportStep(
-                'Clearing $existingCards existing favorites');
+            EnhancedAllureHelper.reportStep('Clear existing favorites', details: 'Clearing $existingCards existing favorites');
             for (int i = 0; i < existingCards; i++) {
               await TestActions.removeHotelFromFavorites($, 0);
             }
           }
 
-          AllureReporter.reportStep('Navigate back to hotels page');
+          EnhancedAllureHelper.reportStep('Navigate back to hotels page');
           await navigateToHotels($);
-          AllureReporter.reportStep('Back to hotels page',
-              status: AllureStepStatus.passed);
 
-          AllureReporter.reportStep('Perform search to get hotels');
+          EnhancedAllureHelper.reportStep('Perform search to get hotels');
           final searchState = await TestActions.performSearch($, 'Paris');
 
           if (searchState == SearchState.hasResults) {
             final availableCards = TestActions.getHotelCardCount();
-            AllureReporter.reportStep(
-                'Found $availableCards hotels to favorite',
-                status: AllureStepStatus.passed);
+            EnhancedAllureHelper.reportStep('Search completed', details: 'Found $availableCards hotels to favorite');
 
             if (availableCards > 0) {
               final hotelsToAdd = availableCards >= 3 ? 3 : availableCards;
               List<String> addedHotelNames = [];
 
-              AllureReporter.reportStep(
-                  'Adding $hotelsToAdd hotels to favorites');
+              EnhancedAllureHelper.reportStep('Add hotels to favorites', details: 'Adding $hotelsToAdd hotels to favorites');
 
               for (int i = 0; i < hotelsToAdd; i++) {
                 try {
@@ -213,13 +242,9 @@ void main() {
                   TestLogger.log('Adding hotel to favorites: "$hotelName"');
 
                   await TestActions.addHotelToFavorites($, i);
-                  TestLogger.log(
-                      'Successfully added hotel ${i + 1} to favorites');
-                  AllureReporter.reportStep('Added hotel ${i + 1}: $hotelName',
-                      status: AllureStepStatus.passed);
+                  TestLogger.log('Successfully added hotel ${i + 1} to favorites');
                 } catch (e) {
-                  TestLogger.log(
-                      'Failed to add hotel ${i + 1} to favorites: $e');
+                  TestLogger.log('Failed to add hotel ${i + 1} to favorites: $e');
                   if (addedHotelNames.length > i) {
                     addedHotelNames.removeLast();
                   }
@@ -227,20 +252,16 @@ void main() {
               }
 
               final actuallyAdded = addedHotelNames.length;
-              AllureReporter.reportStep(
-                  'Successfully added $actuallyAdded hotels to favorites',
-                  status: AllureStepStatus.passed);
+              EnhancedAllureHelper.reportStep('Hotels added to favorites', details: 'Successfully added $actuallyAdded hotels to favorites');
               TestLogger.log('Added hotels: $addedHotelNames');
 
               if (actuallyAdded > 0) {
-                AllureReporter.reportStep(
-                    'Navigate to favorites page to verify');
+                EnhancedAllureHelper.reportStep('Navigate to favorites page to verify');
                 await TestHelpers.navigateToPage($, 'favorites');
                 await $.pump(const Duration(seconds: 1));
-                AllureReporter.reportStep('Navigated to favorites page',
-                    status: AllureStepStatus.passed);
 
-                AllureReporter.reportStep('Verify favorites count and content');
+                EnhancedAllureHelper.reportStep(
+                    'Verify favorites count and content');
                 final favoritesCards = TestActions.getHotelCardCount();
 
                 expect(favoritesCards, equals(actuallyAdded),
@@ -249,11 +270,10 @@ void main() {
 
                 TestLogger.log(
                     'VERIFIED: Favorites count matches - Expected: $actuallyAdded, Found: $favoritesCards');
-                AllureReporter.reportStep(
-                    'FAVORITES COUNT VERIFIED: $favoritesCards matches $actuallyAdded',
-                    status: AllureStepStatus.passed);
+                EnhancedAllureHelper.reportStep('Favorites count verified',
+                    details: '$favoritesCards matches $actuallyAdded');
 
-                AllureReporter.reportStep(
+                EnhancedAllureHelper.reportStep(
                     'Remove hotels from favorites by unchecking hearts');
                 int removedCount = 0;
 
@@ -267,14 +287,12 @@ void main() {
                     removedCount++;
 
                     TestLogger.log('Removed hotel $removedCount: "$hotelName"');
-                    AllureReporter.reportStep('Removed hotel: $hotelName',
-                        status: AllureStepStatus.passed);
                   } catch (e) {
                     TestLogger.log('Failed to remove favorite ${i + 1}: $e');
                   }
                 }
 
-                AllureReporter.reportStep(
+                EnhancedAllureHelper.reportStep(
                     'Verify all hotels are removed from favorites');
                 await $.pump(const Duration(seconds: 1));
 
@@ -285,24 +303,35 @@ void main() {
                 TestActions.verifyEmptyState($);
 
                 TestLogger.log('SUCCESS: All hotels removed from favorites!');
-                AllureReporter.reportStep(
-                    'ALL HOTELS REMOVED - Empty state verified',
-                    status: AllureStepStatus.passed);
+                EnhancedAllureHelper.reportStep(
+                    'All hotels removed - empty state verified');
               } else {
-                AllureReporter.reportStep(
-                    'No hotels were successfully added to favorites',
-                    status: AllureStepStatus.failed);
+                EnhancedAllureHelper.reportStep(
+                  'No hotels were successfully added to favorites',
+                  status: AllureStepStatus.failed,
+                );
                 throw Exception(
                     'Could not add any hotels to favorites for testing');
               }
             }
           }
 
-          AllureReporter.setTestStatus(status: AllureTestStatus.passed);
+          await EnhancedAllureHelper.finishTest(
+            'Add hotels to favorites and verify in favorites page',
+            status: AllureTestStatus.passed,
+          );
         } catch (e, stackTrace) {
-          AllureReporter.setTestStatus(
+          EnhancedAllureHelper.reportStep(
+            'Favorites workflow test failed',
+            status: AllureStepStatus.failed,
+            details: e.toString(),
+          );
+
+          await EnhancedAllureHelper.finishTest(
+            'Add hotels to favorites and verify in favorites page',
             status: AllureTestStatus.failed,
-            reason: 'Favorites test failed: $e\nStack trace: $stackTrace',
+            errorMessage: e.toString(),
+            stackTrace: stackTrace.toString(),
           );
           rethrow;
         }

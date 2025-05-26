@@ -1,0 +1,342 @@
+name: Firebase Test Lab
+
+on:
+  workflow_dispatch:
+    inputs:
+      triggered_by:
+        description: 'Triggered by commit SHA'
+        required: true
+        type: string
+      branch:
+        description: 'Branch name'
+        required: true
+        type: string
+  schedule:
+    # Run nightly at 2 AM UTC
+    - cron: '0 2 * * *'
+
+env:
+  FLUTTER_VERSION: '3.19.0'
+  JAVA_VERSION: '17'
+  GOOGLE_CLOUD_PROJECT: ${{ secrets.FIREBASE_PROJECT_ID }}
+
+jobs:
+  # =============================================================================
+  # Build Test Apps for Firebase Test Lab
+  # =============================================================================
+  build-test-apps:
+    name: Build Test Apps
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+          
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'stable'
+          cache: true
+          
+      - name: Cache Flutter dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-flutter-${{ hashFiles('**/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-flutter-
+            
+      - name: Install dependencies
+        run: |
+          flutter clean
+          flutter pub get
+          
+      - name: Build Android Test APKs
+        run: |
+          # Build the main app APK
+          flutter build apk --debug
+          
+          # Build the test APK
+          pushd android
+          ./gradlew app:assembleAndroidTest
+          ./gradlew app:assembleDebug -Ptarget=integration_test/app_test.dart
+          popd
+          
+      - name: Build iOS Test App
+        run: |
+          # Build iOS test app
+          flutter build ios integration_test/app_test.dart --simulator
+          
+          # Create iOS test runner
+          pushd ios
+          xcodebuild build-for-testing \
+            -workspace Runner.xcworkspace \
+            -scheme Runner \
+            -destination 'platform=iOS Simulator,name=iPhone 15 Pro' \
+            -derivedDataPath DerivedData
+          popd
+          
+      - name: Upload Android APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-test-apks
+          path: |
+            build/app/outputs/apk/debug/*.apk
+            android/app/build/outputs/apk/androidTest/debug/*.apk
+          retention-days: 7
+          
+      - name: Upload iOS Test Bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-test-bundle
+          path: |
+            ios/DerivedData/Build/Products/Debug-iphonesimulator/*.app
+            ios/DerivedData/Build/Products/Debug-iphonesimulator/*.xctestrun
+          retention-days: 7
+
+  # =============================================================================
+  # Run Android Tests on Firebase Test Lab
+  # =============================================================================
+  firebase-android-tests:
+    name: Firebase Android Tests
+    runs-on: ubuntu-latest
+    needs: build-test-apps
+    timeout-minutes: 60
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Download Android APKs
+        uses: actions/download-artifact@v4
+        with:
+          name: android-test-apks
+          path: android-apks/
+          
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_KEY }}
+          project_id: ${{ secrets.FIREBASE_PROJECT_ID }}
+          
+      - name: Setup Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.FIREBASE_PROJECT_ID }}
+          
+      - name: Run Android Tests on Firebase Test Lab
+        run: |
+          # Find APK files
+          APP_APK=$(find android-apks -name "*debug.apk" | grep -v "androidTest" | head -1)
+          TEST_APK=$(find android-apks -name "*androidTest-debug.apk" | head -1)
+          
+          echo "App APK: $APP_APK"
+          echo "Test APK: $TEST_APK"
+          
+          # Run tests on Firebase Test Lab
+          gcloud firebase test android run \
+            --type instrumentation \
+            --app "$APP_APK" \
+            --test "$TEST_APK" \
+            --device model=Pixel7,version=34,locale=en,orientation=portrait \
+            --timeout 30m \
+            --results-bucket=${{ secrets.FIREBASE_RESULTS_BUCKET }} \
+            --results-dir="android-$(date +%Y%m%d-%H%M%S)" \
+            --environment-variables coverage=true,clearPackageData=true \
+            --test-targets "class com.example.hotel_booking.MainActivityTest" \
+            --use-orchestrator \
+            --format=json \
+            --quiet
+            
+      - name: Download Firebase Test Results
+        if: always()
+        run: |
+          # Download test results from Firebase
+          mkdir -p firebase-results/android
+          gsutil -m cp -r gs://${{ secrets.FIREBASE_RESULTS_BUCKET }}/android-* firebase-results/android/ || true
+          
+      - name: Upload Firebase Android Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firebase-android-results
+          path: firebase-results/android/
+          retention-days: 30
+
+  # =============================================================================
+  # Run iOS Tests on Firebase Test Lab
+  # =============================================================================
+  firebase-ios-tests:
+    name: Firebase iOS Tests
+    runs-on: ubuntu-latest
+    needs: build-test-apps
+    timeout-minutes: 60
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Download iOS Test Bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: ios-test-bundle
+          path: ios-bundle/
+          
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_KEY }}
+          project_id: ${{ secrets.FIREBASE_PROJECT_ID }}
+          
+      - name: Setup Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.FIREBASE_PROJECT_ID }}
+          
+      - name: Prepare iOS Test Bundle
+        run: |
+          # Create test zip
+          cd ios-bundle
+          zip -r ios_tests.zip .
+          cd ..
+          
+      - name: Run iOS Tests on Firebase Test Lab
+        run: |
+          # Run tests on Firebase Test Lab
+          gcloud firebase test ios run \
+            --test ios-bundle/ios_tests.zip \
+            --device model=iphone15pro,version=17.2,locale=en_US,orientation=portrait \
+            --timeout 30m \
+            --results-bucket=${{ secrets.FIREBASE_RESULTS_BUCKET }} \
+            --results-dir="ios-$(date +%Y%m%d-%H%M%S)" \
+            --format=json \
+            --quiet
+            
+      - name: Download Firebase Test Results
+        if: always()
+        run: |
+          # Download test results from Firebase
+          mkdir -p firebase-results/ios
+          gsutil -m cp -r gs://${{ secrets.FIREBASE_RESULTS_BUCKET }}/ios-* firebase-results/ios/ || true
+          
+      - name: Upload Firebase iOS Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firebase-ios-results
+          path: firebase-results/ios/
+          retention-days: 30
+
+  # =============================================================================
+  # Process Firebase Test Lab Results
+  # =============================================================================
+  process-firebase-results:
+    name: Process Firebase Results
+    runs-on: ubuntu-latest
+    needs: [firebase-android-tests, firebase-ios-tests]
+    if: always()
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Download Firebase Android Results
+        uses: actions/download-artifact@v4
+        with:
+          name: firebase-android-results
+          path: firebase-results/android/
+        continue-on-error: true
+        
+      - name: Download Firebase iOS Results
+        uses: actions/download-artifact@v4
+        with:
+          name: firebase-ios-results
+          path: firebase-results/ios/
+        continue-on-error: true
+        
+      - name: Parse Firebase Test Results
+        run: |
+          echo "## 🔥 Firebase Test Lab Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Process Android Results
+          if [ -d "firebase-results/android" ]; then
+            echo "### 🤖 Android Firebase Tests" >> $GITHUB_STEP_SUMMARY
+            echo "- Device: Pixel 7 (API 34)" >> $GITHUB_STEP_SUMMARY
+            
+            # Check for test results
+            if find firebase-results/android -name "*.xml" -o -name "*.json" | grep -q .; then
+              echo "- Status: ✅ Completed" >> $GITHUB_STEP_SUMMARY
+              echo "- Results: Available in artifacts" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- Status: ❌ Failed or No Results" >> $GITHUB_STEP_SUMMARY
+            fi
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Process iOS Results
+          if [ -d "firebase-results/ios" ]; then
+            echo "### 📱 iOS Firebase Tests" >> $GITHUB_STEP_SUMMARY
+            echo "- Device: iPhone 15 Pro (iOS 17.2)" >> $GITHUB_STEP_SUMMARY
+            
+            # Check for test results
+            if find firebase-results/ios -name "*.xml" -o -name "*.json" | grep -q .; then
+              echo "- Status: ✅ Completed" >> $GITHUB_STEP_SUMMARY
+              echo "- Results: Available in artifacts" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- Status: ❌ Failed or No Results" >> $GITHUB_STEP_SUMMARY
+            fi
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Add Firebase Console link
+          echo "### 🔗 Links" >> $GITHUB_STEP_SUMMARY
+          echo "- [Firebase Console](https://console.firebase.google.com/project/${{ secrets.FIREBASE_PROJECT_ID }}/testlab/histories)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Test Results Bucket](https://console.cloud.google.com/storage/browser/${{ secrets.FIREBASE_RESULTS_BUCKET }})" >> $GITHUB_STEP_SUMMARY
+          
+      - name: Create Firebase Test Report
+        run: |
+          mkdir -p reports
+          
+          cat > reports/firebase-summary.md << EOF
+          # Firebase Test Lab Summary
+          
+          **Triggered by:** ${{ github.event.inputs.triggered_by || 'Scheduled run' }}
+          **Branch:** ${{ github.event.inputs.branch || github.ref_name }}
+          **Timestamp:** $(date -u)
+          
+          ## Test Configurations
+          
+          ### Android
+          - Device: Google Pixel 7
+          - OS Version: Android 14 (API 34)
+          - Locale: en_US
+          - Orientation: Portrait
+          
+          ### iOS  
+          - Device: iPhone 15 Pro
+          - OS Version: iOS 17.2
+          - Locale: en_US
+          - Orientation: Portrait
+          
+          ## Results
+          Results are available in the Firebase Console and as GitHub Actions artifacts.
+          EOF
+          
+      - name: Upload Firebase Summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: firebase-test-summary
+          path: reports/
+          retention-days: 30

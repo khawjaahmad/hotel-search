@@ -5,10 +5,19 @@ import '../utils/test_helpers.dart';
 import '../utils/test_utils.dart';
 import '../utils/patrol_config.dart';
 import '../reports/allure_reporter.dart';
+import '../helpers/allure_helper.dart';
 import '../locators/app_locators.dart';
 
 void main() {
   group('Account Feature Integration Tests', () {
+    setUpAll(() async {
+      await EnhancedAllureHelper.initialize();
+    });
+
+    tearDownAll(() async {
+      await EnhancedAllureHelper.finalize();
+    });
+
     Future<void> initializeTest(PatrolIntegrationTester $) async {
       await TestUtils.initializeAllure();
       await TestHelpers.initializeApp($);
@@ -47,30 +56,43 @@ void main() {
       'Account page loads correctly',
       config: PatrolConfig.getConfig(),
       ($) async {
-        AllureReporter.addLabel('feature', 'Account Page');
-        AllureReporter.setSeverity(AllureSeverity.critical);
+        await EnhancedAllureHelper.startTest(
+          'Account page loads correctly',
+          description: 'Verify account page loads with all required elements',
+          labels: [
+            'feature:account',
+            'component:page_load',
+            'priority:critical'
+          ],
+          severity: AllureSeverity.critical,
+        );
 
         try {
-          AllureReporter.reportStep('Initialize app');
+          EnhancedAllureHelper.reportStep('Initialize application');
           await initializeTest($);
-          AllureReporter.reportStep('App initialized',
-              status: AllureStepStatus.passed);
 
-          AllureReporter.reportStep('Navigate to Account page');
+          EnhancedAllureHelper.reportStep('Navigate to Account page');
           await navigateToAccount($);
-          AllureReporter.reportStep('Navigation completed',
-              status: AllureStepStatus.passed);
 
-          AllureReporter.reportStep('Verify account page elements');
+          EnhancedAllureHelper.reportStep('Verify account page elements');
           verifyAccountPageElements($);
-          AllureReporter.reportStep('Account page elements verified',
-              status: AllureStepStatus.passed);
 
-          AllureReporter.setTestStatus(status: AllureTestStatus.passed);
+          await EnhancedAllureHelper.finishTest(
+            'Account page loads correctly',
+            status: AllureTestStatus.passed,
+          );
         } catch (e, stackTrace) {
-          AllureReporter.setTestStatus(
+          EnhancedAllureHelper.reportStep(
+            'Account page load test failed',
+            status: AllureStepStatus.failed,
+            details: e.toString(),
+          );
+
+          await EnhancedAllureHelper.finishTest(
+            'Account page loads correctly',
             status: AllureTestStatus.failed,
-            reason: 'Test failed: $e\nStack trace: $stackTrace',
+            errorMessage: e.toString(),
+            stackTrace: stackTrace.toString(),
           );
           rethrow;
         }
@@ -81,26 +103,38 @@ void main() {
       'Account page displays correct title and content',
       config: PatrolConfig.getConfig(),
       ($) async {
-        AllureReporter.addLabel('feature', 'Account Content');
-        AllureReporter.setSeverity(AllureSeverity.critical);
+        await EnhancedAllureHelper.startTest(
+          'Account page displays correct title and content',
+          description:
+              'Verify account page displays correct title and content elements',
+          labels: ['feature:account', 'component:content', 'priority:critical'],
+          severity: AllureSeverity.critical,
+        );
 
         try {
-          AllureReporter.reportStep('Initialize app');
+          EnhancedAllureHelper.reportStep('Initialize application');
           await initializeTest($);
           await navigateToAccount($);
-          AllureReporter.reportStep('App initialized and navigated',
-              status: AllureStepStatus.passed);
 
-          AllureReporter.reportStep('Verify account title text');
+          EnhancedAllureHelper.reportStep('Verify account title and content');
           verifyAccountContent($);
-          AllureReporter.reportStep('Account content verified',
-              status: AllureStepStatus.passed);
 
-          AllureReporter.setTestStatus(status: AllureTestStatus.passed);
+          await EnhancedAllureHelper.finishTest(
+            'Account page displays correct title and content',
+            status: AllureTestStatus.passed,
+          );
         } catch (e, stackTrace) {
-          AllureReporter.setTestStatus(
+          EnhancedAllureHelper.reportStep(
+            'Account content verification failed',
+            status: AllureStepStatus.failed,
+            details: e.toString(),
+          );
+
+          await EnhancedAllureHelper.finishTest(
+            'Account page displays correct title and content',
             status: AllureTestStatus.failed,
-            reason: 'Test failed: $e\nStack trace: $stackTrace',
+            errorMessage: e.toString(),
+            stackTrace: stackTrace.toString(),
           );
           rethrow;
         }

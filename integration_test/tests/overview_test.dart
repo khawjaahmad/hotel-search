@@ -5,10 +5,19 @@ import '../utils/test_helpers.dart';
 import '../utils/test_utils.dart';
 import '../utils/patrol_config.dart';
 import '../reports/allure_reporter.dart';
+import '../helpers/allure_helper.dart';
 import '../locators/app_locators.dart';
 
 void main() {
   group('Overview Feature Integration Tests', () {
+    setUpAll(() async {
+      await EnhancedAllureHelper.initialize();
+    });
+
+    tearDownAll(() async {
+      await EnhancedAllureHelper.finalize();
+    });
+
     Future<void> initializeTest(PatrolIntegrationTester $) async {
       await TestUtils.initializeAllure();
       await TestHelpers.initializeApp($);
@@ -60,35 +69,43 @@ void main() {
       'Overview page loads and displays correctly',
       config: PatrolConfig.getConfig(),
       ($) async {
-        AllureReporter.addLabel('feature', 'Overview Page');
-        AllureReporter.setSeverity(AllureSeverity.critical);
+        await EnhancedAllureHelper.startTest(
+          'Overview page loads and displays correctly',
+          description:
+              'Verify that overview page loads with all required elements',
+          labels: ['feature:overview', 'priority:critical', 'component:page'],
+          severity: AllureSeverity.critical,
+        );
 
         try {
-          AllureReporter.reportStep('Initialize app');
+          EnhancedAllureHelper.reportStep('Initialize application');
           await initializeTest($);
-          AllureReporter.reportStep('App initialized',
-              status: AllureStepStatus.passed);
 
-          AllureReporter.reportStep('Verify overview page is loaded');
+          EnhancedAllureHelper.reportStep('Verify overview page loaded');
           await AppLocators.smartWaitFor($, AppLocators.getOverviewScaffold($));
-          AllureReporter.reportStep('Overview page loaded',
-              status: AllureStepStatus.passed);
 
-          AllureReporter.reportStep('Verify page elements');
+          EnhancedAllureHelper.reportStep('Verify page elements present');
           verifyOverviewPageElements($);
-          AllureReporter.reportStep('Page elements verified',
-              status: AllureStepStatus.passed);
 
-          AllureReporter.reportStep('Validate navigation');
+          EnhancedAllureHelper.reportStep('Validate navigation system');
           await AppLocators.validateNavigation($);
-          AllureReporter.reportStep('Navigation validated',
-              status: AllureStepStatus.passed);
 
-          AllureReporter.setTestStatus(status: AllureTestStatus.passed);
+          await EnhancedAllureHelper.finishTest(
+            'Overview page loads and displays correctly',
+            status: AllureTestStatus.passed,
+          );
         } catch (e, stackTrace) {
-          AllureReporter.setTestStatus(
+          EnhancedAllureHelper.reportStep(
+            'Test execution failed',
+            status: AllureStepStatus.failed,
+            details: e.toString(),
+          );
+
+          await EnhancedAllureHelper.finishTest(
+            'Overview page loads and displays correctly',
             status: AllureTestStatus.failed,
-            reason: 'Test failed: $e\nStack trace: $stackTrace',
+            errorMessage: e.toString(),
+            stackTrace: stackTrace.toString(),
           );
           rethrow;
         }
@@ -99,32 +116,45 @@ void main() {
       'Overview page displays correct branding content',
       config: PatrolConfig.getConfig(),
       ($) async {
-        AllureReporter.addLabel('feature', 'Overview Branding');
-        AllureReporter.setSeverity(AllureSeverity.critical);
+        await EnhancedAllureHelper.startTest(
+          'Overview page displays correct branding content',
+          description: 'Verify branding elements and content display correctly',
+          labels: [
+            'feature:overview',
+            'priority:critical',
+            'component:branding'
+          ],
+          severity: AllureSeverity.critical,
+        );
 
         try {
-          AllureReporter.reportStep('Initialize app');
+          EnhancedAllureHelper.reportStep('Initialize application');
           await initializeTest($);
           await navigateToOverview($);
-          AllureReporter.reportStep('App initialized and navigated',
-              status: AllureStepStatus.passed);
 
-          AllureReporter.reportStep('Verify branding content');
+          EnhancedAllureHelper.reportStep('Verify branding content displayed');
           verifyOverviewContent($);
-          AllureReporter.reportStep('Branding content verified',
-              status: AllureStepStatus.passed);
 
-          AllureReporter.reportStep('Verify page title in app bar');
+          EnhancedAllureHelper.reportStep('Verify page title in app bar');
           final titleFinder = AppLocators.getOverviewTitle($);
           await AppLocators.smartWaitFor($, titleFinder);
-          AllureReporter.reportStep('Page title verified',
-              status: AllureStepStatus.passed);
 
-          AllureReporter.setTestStatus(status: AllureTestStatus.passed);
+          await EnhancedAllureHelper.finishTest(
+            'Overview page displays correct branding content',
+            status: AllureTestStatus.passed,
+          );
         } catch (e, stackTrace) {
-          AllureReporter.setTestStatus(
+          EnhancedAllureHelper.reportStep(
+            'Branding verification failed',
+            status: AllureStepStatus.failed,
+            details: e.toString(),
+          );
+
+          await EnhancedAllureHelper.finishTest(
+            'Overview page displays correct branding content',
             status: AllureTestStatus.failed,
-            reason: 'Test failed: $e\nStack trace: $stackTrace',
+            errorMessage: e.toString(),
+            stackTrace: stackTrace.toString(),
           );
           rethrow;
         }
@@ -135,31 +165,45 @@ void main() {
       'Overview page navigation functionality works',
       config: PatrolConfig.getConfig(),
       ($) async {
-        AllureReporter.addLabel('feature', 'Overview Navigation');
-        AllureReporter.setSeverity(AllureSeverity.critical);
+        await EnhancedAllureHelper.startTest(
+          'Overview page navigation functionality works',
+          description:
+              'Test navigation flow from overview to other pages and back',
+          labels: [
+            'feature:overview',
+            'priority:critical',
+            'component:navigation'
+          ],
+          severity: AllureSeverity.critical,
+        );
 
         try {
-          AllureReporter.reportStep('Initialize app');
+          EnhancedAllureHelper.reportStep('Initialize application');
           await initializeTest($);
-          AllureReporter.reportStep('App initialized',
-              status: AllureStepStatus.passed);
 
-          AllureReporter.reportStep('Test navigation flow');
+          EnhancedAllureHelper.reportStep('Execute navigation flow test');
           await testNavigationFlow($);
-          AllureReporter.reportStep('Navigation flow completed',
-              status: AllureStepStatus.passed);
 
-          AllureReporter.reportStep('Verify return to overview');
+          EnhancedAllureHelper.reportStep('Verify return to overview state');
           verifyOverviewPageElements($);
           verifyOverviewContent($);
-          AllureReporter.reportStep('Return to overview verified',
-              status: AllureStepStatus.passed);
 
-          AllureReporter.setTestStatus(status: AllureTestStatus.passed);
+          await EnhancedAllureHelper.finishTest(
+            'Overview page navigation functionality works',
+            status: AllureTestStatus.passed,
+          );
         } catch (e, stackTrace) {
-          AllureReporter.setTestStatus(
+          EnhancedAllureHelper.reportStep(
+            'Navigation flow test failed',
+            status: AllureStepStatus.failed,
+            details: e.toString(),
+          );
+
+          await EnhancedAllureHelper.finishTest(
+            'Overview page navigation functionality works',
             status: AllureTestStatus.failed,
-            reason: 'Test failed: $e\nStack trace: $stackTrace',
+            errorMessage: e.toString(),
+            stackTrace: stackTrace.toString(),
           );
           rethrow;
         }

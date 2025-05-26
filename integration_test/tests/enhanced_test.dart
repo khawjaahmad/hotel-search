@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:patrol/patrol.dart';
 import '../logger/test_logger.dart';
+import '../reports/allure_reporter.dart';
+import '../helpers/allure_helper.dart';
 import '../locators/app_locators.dart';
 
 class EnhancedScrollTester {
@@ -166,9 +168,19 @@ class EnhancedScrollTester {
     PatrolIntegrationTester $,
     String testName,
   ) async {
-    TestLogger.log('Starting realistic pagination test: $testName');
+    await EnhancedAllureHelper.startTest(
+      testName,
+      description:
+          'Test realistic pagination behavior with continuous scrolling',
+      labels: ['feature:pagination', 'component:scroll', 'priority:medium'],
+      severity: AllureSeverity.normal,
+    );
 
     try {
+      EnhancedAllureHelper.reportStep('Initialize pagination test');
+      TestLogger.log('Starting realistic pagination test: $testName');
+
+      EnhancedAllureHelper.reportStep('Perform search for pagination test');
       await _performSearchForPagination($, 'London');
       await $.pump(const Duration(seconds: 2));
 
@@ -177,17 +189,37 @@ class EnhancedScrollTester {
         throw Exception('No search results to test pagination');
       }
 
+      EnhancedAllureHelper.reportStep('Execute continuous scroll test');
       TestLogger.log(
           'Ready to test pagination with $initialCards initial cards');
 
       final result = await performContinuousScroll($);
 
+      EnhancedAllureHelper.reportStep('Validate pagination results');
       _validatePaginationResult(result, testName);
 
       TestLogger.log('Pagination test completed successfully: $testName');
+
+      await EnhancedAllureHelper.finishTest(
+        testName,
+        status: AllureTestStatus.passed,
+      );
     } catch (e, stackTrace) {
+      EnhancedAllureHelper.reportStep(
+        'Pagination test execution failed',
+        status: AllureStepStatus.failed,
+        details: e.toString(),
+      );
+
       TestLogger.log('Pagination test failed: $testName - $e');
       TestLogger.log('Stack trace: $stackTrace');
+
+      await EnhancedAllureHelper.finishTest(
+        testName,
+        status: AllureTestStatus.failed,
+        errorMessage: e.toString(),
+        stackTrace: stackTrace.toString(),
+      );
       rethrow;
     }
   }

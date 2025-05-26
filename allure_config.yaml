@@ -1,0 +1,54 @@
+# Allure Configuration for Flutter Integration Tests
+# Place this file in your project root as allure.yaml
+
+reporting:
+  output-directory: "allure-results"
+  report-directory: "allure-report"
+  auto-open: true
+  
+plugins:
+  - junit-xml-plugin
+  - attachments-plugin
+  - environment-plugin
+  
+environment:
+  Platform: "Flutter"
+  Framework: "Patrol Integration Tests"
+  Test.Runner: "flutter_test"
+  
+categories:
+  - name: "Hotels Feature Tests"
+    matchedStatuses:
+      - failed
+      - broken
+    messageRegex: ".*hotels.*"
+    
+  - name: "Favorites Feature Tests"
+    matchedStatuses:
+      - failed
+      - broken
+    messageRegex: ".*favorites.*"
+    
+  - name: "Navigation Tests"
+    matchedStatuses:
+      - failed
+      - broken
+    messageRegex: ".*navigation.*|.*dashboard.*"
+    
+  - name: "Search Tests"
+    matchedStatuses:
+      - failed
+      - broken
+    messageRegex: ".*search.*"
+
+history:
+  enabled: true
+  storage: "file"
+  
+attachments:
+  screenshot:
+    enabled: true
+    path: "screenshots"
+  logs:
+    enabled: true
+    path: "logs"
