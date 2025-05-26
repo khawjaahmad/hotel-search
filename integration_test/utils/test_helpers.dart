@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:patrol/patrol.dart';
 import 'package:hotel_booking/main.dart' as app;
 import '../logger/test_logger.dart';
+import '../locators/app_locators.dart';
 
 class TestHelpers {
   static bool _isAppInitialized = false;
@@ -39,43 +40,25 @@ class TestHelpers {
     TestLogger.log(
         'Navigating to $tabName tab${description != null ? ': $description' : ''}');
 
-    // Use the correct navigation method
-    switch (tabName.toLowerCase()) {
-      case 'overview':
-        await $(find.byKey(const Key('navigation_overview_tab'))).tap();
-        break;
-      case 'hotels':
-        await $(find.byKey(const Key('navigation_hotels_tab'))).tap();
-        break;
-      case 'favorites':
-        await $(find.byKey(const Key('navigation_favorites_tab'))).tap();
-        break;
-      case 'account':
-        await $(find.byKey(const Key('navigation_account_tab'))).tap();
-        break;
-      default:
-        throw ArgumentError('Unknown tab: $tabName');
-    }
-
+    final tabFinder = AppLocators.getNavigationTab($, tabName);
+    await AppLocators.smartTap($, tabFinder);
     await $.pump(const Duration(milliseconds: 500));
     await $.pumpAndSettle();
   }
 
-  /// PROPER SCROLL FUNCTION FOR HOTELS LIST
-  /// This function will actually perform scrolling and verify it worked
   static Future<ScrollResult> performHotelsScroll(
     PatrolIntegrationTester $, {
-    int maxScrolls = 5,
+    int maxScrolls = 10,
     Duration scrollTimeout = const Duration(seconds: 30),
   }) async {
-    TestLogger.log('🔄 Starting hotels scroll operation');
+    TestLogger.log(
+        'Starting continuous scroll until pagination loader appears');
 
-    // First, get the initial state
     final initialCardCount = find.byType(Card).evaluate().length;
-    TestLogger.log('📊 Initial card count: $initialCardCount');
+    TestLogger.log('Initial card count: $initialCardCount');
 
     if (initialCardCount == 0) {
-      TestLogger.log('⚠️ No cards found - cannot scroll');
+      TestLogger.log('No cards found - cannot scroll');
       return ScrollResult(
         success: false,
         initialCount: 0,
@@ -88,161 +71,225 @@ class TestHelpers {
     int scrollAttempts = 0;
     String? lastError;
 
-    // Method 1: Try scrolling using the hotels_scroll_view key
-    TestLogger.log('🔄 Attempting Method 1: hotels_scroll_view');
     try {
-      final scrollView = find.byKey(const Key('hotels_scroll_view'));
-      if (scrollView.evaluate().isNotEmpty) {
-        TestLogger.log('✅ Found hotels_scroll_view');
+      final hotelsScrollView = AppLocators.getHotelsScrollView($);
+      if (AppLocators.elementExists($, hotelsScrollView)) {
+        TestLogger.log('Found hotels_scroll_view, starting continuous scroll');
 
-        for (int i = 0; i < maxScrolls; i++) {
+        bool paginationTriggered = false;
+
+        while (scrollAttempts < maxScrolls && !paginationTriggered) {
           scrollAttempts++;
-          TestLogger.log('📱 Scroll attempt $scrollAttempts/$maxScrolls');
+          TestLogger.log(
+              'Continuous scroll attempt $scrollAttempts/$maxScrolls - looking for pagination loader');
 
-          // Perform the scroll
-          await $(scrollView).scrollTo(maxScrolls: 1);
-          await $.pump(
-              const Duration(seconds: 2)); // Wait for potential new content
+          await $.tester.drag(find.byKey(const Key('hotels_scroll_view')),
+              const Offset(0, -400));
+          await $.pump(const Duration(milliseconds: 500));
+
+          final paginationLoading = AppLocators.getHotelsPaginationLoading($);
+          if (AppLocators.elementExists($, paginationLoading)) {
+            TestLogger.log(
+                'SUCCESS: Pagination loader appeared after $scrollAttempts scrolls!');
+            paginationTriggered = true;
+
+            TestLogger.log('Waiting for pagination to complete...');
+            int waitAttempts = 0;
+            while (AppLocators.elementExists($, paginationLoading) &&
+                waitAttempts < 15) {
+              await $.pump(const Duration(milliseconds: 500));
+              waitAttempts++;
+              TestLogger.log('Waiting for pagination... attempt $waitAttempts');
+            }
+
+            if (waitAttempts >= 15) {
+              TestLogger.log(
+                  'Pagination taking too long, but loader was triggered');
+            } else {
+              TestLogger.log(
+                  'Pagination completed after ${waitAttempts * 500}ms');
+            }
+
+            await $.pump(const Duration(seconds: 1));
+            break;
+          }
 
           final currentCount = find.byType(Card).evaluate().length;
-          TestLogger.log(
-              '📊 Cards after scroll $scrollAttempts: $currentCount');
-
-          // Check if new content loaded
           if (currentCount > initialCardCount) {
             TestLogger.log(
-                '🎉 New content loaded! $initialCardCount -> $currentCount');
-            return ScrollResult(
-              success: true,
-              initialCount: initialCardCount,
-              finalCount: currentCount,
-              scrollAttempts: scrollAttempts,
-            );
+                'New content loaded without seeing loader: $initialCardCount -> $currentCount');
+            paginationTriggered = true;
+            break;
           }
 
-          // Check if we reached end (pagination loading indicator)
-          final paginationLoading =
-              find.byKey(const Key('hotels_pagination_loading'));
-          if (paginationLoading.evaluate().isNotEmpty) {
-            TestLogger.log('⏳ Pagination loading detected, waiting...');
-            await $.pump(const Duration(seconds: 3));
-
-            final afterLoadingCount = find.byType(Card).evaluate().length;
-            if (afterLoadingCount > currentCount) {
-              TestLogger.log(
-                  '🎉 Content loaded after pagination! $currentCount -> $afterLoadingCount');
-              return ScrollResult(
-                success: true,
-                initialCount: initialCardCount,
-                finalCount: afterLoadingCount,
-                scrollAttempts: scrollAttempts,
-              );
-            }
-          }
+          TestLogger.log(
+              'No pagination loader yet, continuing to scroll down...');
+          await $.pump(const Duration(milliseconds: 300));
         }
 
-        // If we get here, scrolling happened but no new content loaded
         final finalCount = find.byType(Card).evaluate().length;
-        TestLogger.log('✅ Scrolling completed, no new content (end of list)');
-        return ScrollResult(
-          success: true,
-          initialCount: initialCardCount,
-          finalCount: finalCount,
-          scrollAttempts: scrollAttempts,
-          reachedEnd: true,
-        );
+
+        if (paginationTriggered || finalCount > initialCardCount) {
+          TestLogger.log(
+              'SUCCESS: Scroll operation completed with new content or loader triggered');
+          return ScrollResult(
+            success: true,
+            initialCount: initialCardCount,
+            finalCount: finalCount,
+            scrollAttempts: scrollAttempts,
+          );
+        } else {
+          TestLogger.log(
+              'Reached max scroll attempts without triggering pagination - likely end of list');
+          return ScrollResult(
+            success: true,
+            initialCount: initialCardCount,
+            finalCount: finalCount,
+            scrollAttempts: scrollAttempts,
+            reachedEnd: true,
+          );
+        }
       }
     } catch (e) {
-      lastError = 'Method 1 failed: $e';
-      TestLogger.log('❌ Method 1 failed: $e');
+      lastError = 'hotels_scroll_view continuous scroll failed: $e';
+      TestLogger.log('hotels_scroll_view continuous scroll failed: $e');
     }
 
-    // Method 2: Try scrolling using CustomScrollView
-    TestLogger.log('🔄 Attempting Method 2: CustomScrollView');
     try {
       final customScrollView = find.byType(CustomScrollView);
       if (customScrollView.evaluate().isNotEmpty) {
-        TestLogger.log('✅ Found CustomScrollView');
+        TestLogger.log('Found CustomScrollView, starting continuous scroll');
 
-        for (int i = 0; i < maxScrolls; i++) {
+        bool paginationTriggered = false;
+
+        while (scrollAttempts < maxScrolls && !paginationTriggered) {
           scrollAttempts++;
           TestLogger.log(
-              '📱 Scroll attempt $scrollAttempts/$maxScrolls (Method 2)');
+              'CustomScrollView continuous scroll attempt $scrollAttempts/$maxScrolls');
 
-          // Scroll the CustomScrollView
-          await $(customScrollView).scrollTo(maxScrolls: 1);
-          await $.pump(const Duration(seconds: 2));
+          await $.tester.drag(customScrollView.first, const Offset(0, -400));
+          await $.pump(const Duration(milliseconds: 500));
+
+          final paginationLoading =
+              find.byKey(const Key('hotels_pagination_loading'));
+          if (paginationLoading.evaluate().isNotEmpty) {
+            TestLogger.log(
+                'SUCCESS: Pagination loader appeared with CustomScrollView!');
+            paginationTriggered = true;
+
+            int waitAttempts = 0;
+            while (
+                paginationLoading.evaluate().isNotEmpty && waitAttempts < 15) {
+              await $.pump(const Duration(milliseconds: 500));
+              waitAttempts++;
+            }
+
+            await $.pump(const Duration(seconds: 1));
+            break;
+          }
 
           final currentCount = find.byType(Card).evaluate().length;
-          TestLogger.log(
-              '📊 Cards after scroll $scrollAttempts: $currentCount');
-
           if (currentCount > initialCardCount) {
             TestLogger.log(
-                '🎉 New content loaded! $initialCardCount -> $currentCount');
-            return ScrollResult(
-              success: true,
-              initialCount: initialCardCount,
-              finalCount: currentCount,
-              scrollAttempts: scrollAttempts,
-            );
+                'New content loaded with CustomScrollView: $initialCardCount -> $currentCount');
+            paginationTriggered = true;
+            break;
           }
+
+          TestLogger.log('CustomScrollView: No pagination yet, continuing...');
+          await $.pump(const Duration(milliseconds: 300));
         }
 
         final finalCount = find.byType(Card).evaluate().length;
-        return ScrollResult(
-          success: true,
-          initialCount: initialCardCount,
-          finalCount: finalCount,
-          scrollAttempts: scrollAttempts,
-          reachedEnd: true,
-        );
+
+        if (paginationTriggered || finalCount > initialCardCount) {
+          return ScrollResult(
+            success: true,
+            initialCount: initialCardCount,
+            finalCount: finalCount,
+            scrollAttempts: scrollAttempts,
+          );
+        } else {
+          return ScrollResult(
+            success: true,
+            initialCount: initialCardCount,
+            finalCount: finalCount,
+            scrollAttempts: scrollAttempts,
+            reachedEnd: true,
+          );
+        }
       }
     } catch (e) {
-      lastError = 'Method 2 failed: $e';
-      TestLogger.log('❌ Method 2 failed: $e');
+      lastError = 'CustomScrollView continuous scroll failed: $e';
+      TestLogger.log('CustomScrollView continuous scroll failed: $e');
     }
 
-    // Method 3: Try scrolling using generic Scrollable
-    TestLogger.log('🔄 Attempting Method 3: Generic Scrollable');
     try {
       final scrollable = find.byType(Scrollable);
       if (scrollable.evaluate().isNotEmpty) {
         TestLogger.log(
-            '✅ Found Scrollable widgets: ${scrollable.evaluate().length}');
+            'Found ${scrollable.evaluate().length} Scrollable widgets, trying continuous scroll');
 
-        // Try each scrollable widget
         for (int scrollableIndex = 0;
             scrollableIndex < scrollable.evaluate().length;
             scrollableIndex++) {
-          TestLogger.log('🔄 Trying Scrollable widget $scrollableIndex');
+          TestLogger.log(
+              'Trying continuous scroll on Scrollable widget $scrollableIndex');
+
+          bool paginationTriggered = false;
+          int startAttempts = scrollAttempts;
 
           try {
-            for (int i = 0; i < maxScrolls; i++) {
+            while (scrollAttempts < maxScrolls && !paginationTriggered) {
               scrollAttempts++;
               TestLogger.log(
-                  '📱 Scroll attempt $scrollAttempts/$maxScrolls (Method 3.$scrollableIndex)');
+                  'Scrollable[$scrollableIndex] continuous scroll attempt ${scrollAttempts - startAttempts}');
 
-              await $(scrollable.at(scrollableIndex)).scrollTo(maxScrolls: 1);
-              await $.pump(const Duration(seconds: 2));
+              await $.tester
+                  .drag(scrollable.at(scrollableIndex), const Offset(0, -400));
+              await $.pump(const Duration(milliseconds: 500));
+
+              final paginationLoading =
+                  find.byKey(const Key('hotels_pagination_loading'));
+              if (paginationLoading.evaluate().isNotEmpty) {
+                TestLogger.log(
+                    'SUCCESS: Pagination loader appeared with Scrollable[$scrollableIndex]!');
+                paginationTriggered = true;
+
+                int waitAttempts = 0;
+                while (paginationLoading.evaluate().isNotEmpty &&
+                    waitAttempts < 15) {
+                  await $.pump(const Duration(milliseconds: 500));
+                  waitAttempts++;
+                }
+
+                await $.pump(const Duration(seconds: 1));
+                break;
+              }
 
               final currentCount = find.byType(Card).evaluate().length;
-              TestLogger.log(
-                  '📊 Cards after scroll $scrollAttempts: $currentCount');
-
               if (currentCount > initialCardCount) {
                 TestLogger.log(
-                    '🎉 New content loaded! $initialCardCount -> $currentCount');
-                return ScrollResult(
-                  success: true,
-                  initialCount: initialCardCount,
-                  finalCount: currentCount,
-                  scrollAttempts: scrollAttempts,
-                );
+                    'New content loaded with Scrollable[$scrollableIndex]: $initialCardCount -> $currentCount');
+                paginationTriggered = true;
+                break;
               }
+
+              await $.pump(const Duration(milliseconds: 300));
+            }
+
+            if (paginationTriggered) {
+              final finalCount = find.byType(Card).evaluate().length;
+              return ScrollResult(
+                success: true,
+                initialCount: initialCardCount,
+                finalCount: finalCount,
+                scrollAttempts: scrollAttempts,
+              );
             }
           } catch (e) {
-            TestLogger.log('❌ Scrollable $scrollableIndex failed: $e');
+            TestLogger.log(
+                'Scrollable $scrollableIndex continuous scroll failed: $e');
             continue;
           }
         }
@@ -257,95 +304,26 @@ class TestHelpers {
         );
       }
     } catch (e) {
-      lastError = 'Method 3 failed: $e';
-      TestLogger.log('❌ Method 3 failed: $e');
+      lastError = 'Direct Scrollable continuous scroll failed: $e';
+      TestLogger.log('Direct Scrollable continuous scroll failed: $e');
     }
 
-    // If all methods failed
-    TestLogger.log('💥 ALL SCROLL METHODS FAILED');
+    TestLogger.log('ALL CONTINUOUS SCROLL STRATEGIES FAILED');
     return ScrollResult(
       success: false,
       initialCount: initialCardCount,
       finalCount: initialCardCount,
       scrollAttempts: scrollAttempts,
-      error: lastError ?? 'All scroll methods failed',
+      error: lastError ?? 'All continuous scroll strategies failed',
     );
   }
 
-  /// STRICT SCROLL VERIFICATION
-  /// This will fail the test if scrolling doesn't actually work
-  static Future<void> verifyScrollWorking(
-    PatrolIntegrationTester $, {
-    bool requireNewContent = false,
-  }) async {
-    TestLogger.log('🔍 Verifying scroll functionality is working');
-
-    final result = await performHotelsScroll($);
-
-    if (!result.success) {
-      throw Exception('SCROLL VERIFICATION FAILED: ${result.error}');
-    }
-
-    if (requireNewContent && !result.hasNewContent) {
-      throw Exception(
-          'SCROLL VERIFICATION FAILED: No new content loaded after scrolling');
-    }
-
-    TestLogger.log('✅ Scroll verification passed: ${result.toString()}');
-  }
-
-  static Future<void> validatePageElements(
-    PatrolIntegrationTester $,
-    String pageKey,
-    List<String> elementKeys, {
-    String? pageName,
-    String? description,
-  }) async {
-    TestLogger.log(
-        'Validating page structure for $pageKey${description != null ? ': $description' : ''}');
-
-    for (final key in elementKeys) {
-      final element = find.byKey(Key(key));
-      expect(element, findsOneWidget, reason: 'Element $key should be present');
-    }
-
-    TestLogger.log('✅ Page validation completed for $pageKey');
-  }
-
-  static Future<bool> isElementVisible(
-    PatrolIntegrationTester $,
-    String elementKey, {
-    String? description,
-  }) async {
-    TestLogger.log(
-        'Checking visibility of element $elementKey${description != null ? ': $description' : ''}');
-    try {
-      final finder = find.byKey(Key(elementKey));
-      return finder.evaluate().isNotEmpty;
-    } catch (e) {
-      TestLogger.log('Element visibility check failed: $e');
-      return false;
-    }
-  }
-
-  static Future<void> waitForAppStability(PatrolIntegrationTester $) async {
-    TestLogger.log('Waiting for app stability');
-    await $.pumpAndSettle();
-    await $.pump(const Duration(milliseconds: 500));
-  }
-
-  static void resetAppState() {
-    TestLogger.log('Resetting app initialization state');
-    _isAppInitialized = false;
-  }
-
-  /// Debug helper to print current scroll state
   static Future<void> debugScrollState(PatrolIntegrationTester $) async {
-    TestLogger.log('🔍 DEBUG: Current scroll state');
+    TestLogger.log('DEBUG: Current scroll state analysis');
 
-    final scrollView = find.byKey(const Key('hotels_scroll_view'));
+    final scrollView = AppLocators.getHotelsScrollView($);
     TestLogger.log(
-        'hotels_scroll_view found: ${scrollView.evaluate().isNotEmpty}');
+        'hotels_scroll_view found: ${AppLocators.elementExists($, scrollView)}');
 
     final customScrollView = find.byType(CustomScrollView);
     TestLogger.log(
@@ -357,18 +335,21 @@ class TestHelpers {
     final cards = find.byType(Card);
     TestLogger.log('Card widgets found: ${cards.evaluate().length}');
 
-    final loadingIndicator = find.byKey(const Key('hotels_loading_indicator'));
+    final loadingIndicator = AppLocators.getHotelsLoadingIndicator($);
     TestLogger.log(
-        'Loading indicator visible: ${loadingIndicator.evaluate().isNotEmpty}');
+        'Main loading indicator: ${AppLocators.elementExists($, loadingIndicator)}');
 
-    final paginationLoading =
-        find.byKey(const Key('hotels_pagination_loading'));
+    final paginationLoading = AppLocators.getHotelsPaginationLoading($);
     TestLogger.log(
-        'Pagination loading visible: ${paginationLoading.evaluate().isNotEmpty}');
+        'Pagination loading indicator: ${AppLocators.elementExists($, paginationLoading)}');
+  }
+
+  static void resetAppState() {
+    TestLogger.log('Resetting app initialization state');
+    _isAppInitialized = false;
   }
 }
 
-/// Result object for scroll operations
 class ScrollResult {
   final bool success;
   final int initialCount;

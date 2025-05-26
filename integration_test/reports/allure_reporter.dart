@@ -2,8 +2,8 @@ import '../logger/test_logger.dart';
 
 class AllureReporter {
   static String? _currentTestName;
-  static List<String> _steps = [];
-  static Map<String, String> _labels = {};
+  static final List<String> _steps = [];
+  static final Map<String, String> _labels = {};
   static AllureSeverity _severity = AllureSeverity.normal;
 
   static Future<void> initialize({

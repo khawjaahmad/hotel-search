@@ -223,6 +223,7 @@ class AppLocators {
       case 'account':
         return getAccountTitle($);
       default:
+        // ignore: unnecessary_string_interpolations
         return $('$pageName');
     }
   }

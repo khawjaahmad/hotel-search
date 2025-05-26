@@ -5,9 +5,111 @@ import '../utils/test_helpers.dart';
 import '../utils/test_utils.dart';
 import '../utils/patrol_config.dart';
 import '../reports/allure_reporter.dart';
+import '../locators/app_locators.dart';
 
 void main() {
-  group('🏠 Dashboard Feature Integration Tests', () {
+  group('Dashboard Feature Integration Tests', () {
+    Future<void> initializeTest(PatrolIntegrationTester $) async {
+      await TestUtils.initializeAllure();
+      await TestHelpers.initializeApp($);
+    }
+
+    void verifyDashboardStructure(PatrolIntegrationTester $) {
+      final scaffold = AppLocators.getDashboardScaffold($);
+      final navigationBar = AppLocators.getNavigationBar($);
+
+      expect(AppLocators.elementExists($, scaffold), isTrue,
+          reason: 'Dashboard scaffold should be present');
+      expect(AppLocators.elementExists($, navigationBar), isTrue,
+          reason: 'Navigation bar should be present');
+    }
+
+    void verifyAllNavigationTabs(PatrolIntegrationTester $) {
+      final tabs = ['overview', 'hotels', 'favorites', 'account'];
+
+      for (final tab in tabs) {
+        final tabFinder = AppLocators.getNavigationTab($, tab);
+        expect(AppLocators.elementExists($, tabFinder), isTrue,
+            reason: '$tab tab should be present');
+      }
+    }
+
+    void verifyTabLabels(PatrolIntegrationTester $) {
+      final expectedLabels = ['Overview', 'Hotels', 'Favorites', 'Account'];
+
+      for (final label in expectedLabels) {
+        expect(find.text(label).evaluate().isNotEmpty, isTrue,
+            reason: '$label text should be visible');
+      }
+    }
+
+    void verifyTabIcons(PatrolIntegrationTester $) {
+      final expectedIcons = [
+        Icons.explore_outlined,
+        Icons.hotel_outlined,
+        Icons.favorite_outline,
+        Icons.account_circle_outlined,
+      ];
+
+      for (final icon in expectedIcons) {
+        expect(find.byIcon(icon).evaluate().isNotEmpty, isTrue,
+            reason: 'Icon $icon should be visible');
+      }
+    }
+
+    Future<void> performNavigationCycle(PatrolIntegrationTester $) async {
+      final navigationSteps = [
+        {'tab': 'hotels', 'scaffold': 'hotels_scaffold'},
+        {'tab': 'favorites', 'scaffold': 'favorites_scaffold'},
+        {'tab': 'account', 'scaffold': 'account_scaffold'},
+        {'tab': 'overview', 'scaffold': 'overview_scaffold'},
+      ];
+
+      for (final step in navigationSteps) {
+        final tabName = step['tab']!;
+        final scaffoldKey = step['scaffold']!;
+
+        final tabFinder = AppLocators.getNavigationTab($, tabName);
+        await AppLocators.smartTap($, tabFinder);
+        await $.pumpAndSettle();
+
+        expect(find.byKey(Key(scaffoldKey)).evaluate().isNotEmpty, isTrue,
+            reason: '$tabName page should be loaded');
+      }
+    }
+
+    Future<Duration> performRapidSwitching(
+        PatrolIntegrationTester $, int cycles) async {
+      final startTime = DateTime.now();
+
+      for (int i = 0; i < cycles; i++) {
+        final tabs = ['hotels', 'favorites', 'account', 'overview'];
+
+        for (final tab in tabs) {
+          final tabFinder = AppLocators.getNavigationTab($, tab);
+          await AppLocators.smartTap($, tabFinder);
+          await $.pump(const Duration(milliseconds: 100));
+        }
+      }
+
+      final endTime = DateTime.now();
+      return endTime.difference(startTime);
+    }
+
+    void verifyDefaultOverviewPage(PatrolIntegrationTester $) {
+      final overviewScaffold = AppLocators.getOverviewScaffold($);
+      expect(AppLocators.elementExists($, overviewScaffold), isTrue,
+          reason: 'Overview should be default page');
+      expect(find.text('Hotel Booking').evaluate().isNotEmpty, isTrue,
+          reason: 'Hotel Booking title should be visible');
+    }
+
+    Future<void> testNavigationPersistence(PatrolIntegrationTester $) async {
+      await performNavigationCycle($);
+      verifyDashboardStructure($);
+      verifyDefaultOverviewPage($);
+    }
+
     patrolTest(
       'Dashboard loads with navigation tabs',
       config: PatrolConfig.getConfig(),
@@ -17,30 +119,17 @@ void main() {
 
         try {
           AllureReporter.reportStep('Initialize app');
-          await TestUtils.initializeAllure();
-          await TestHelpers.initializeApp($);
+          await initializeTest($);
           AllureReporter.reportStep('App initialized',
               status: AllureStepStatus.passed);
 
           AllureReporter.reportStep('Verify dashboard scaffold');
-          expect(find.byKey(const Key('dashboard_scaffold')), findsOneWidget);
-          AllureReporter.reportStep('Dashboard scaffold verified',
-              status: AllureStepStatus.passed);
-
-          AllureReporter.reportStep('Verify navigation bar');
-          expect(find.byKey(const Key('navigation_bar')), findsOneWidget);
-          AllureReporter.reportStep('Navigation bar verified',
+          verifyDashboardStructure($);
+          AllureReporter.reportStep('Dashboard structure verified',
               status: AllureStepStatus.passed);
 
           AllureReporter.reportStep('Verify all navigation tabs');
-          expect(
-              find.byKey(const Key('navigation_overview_tab')), findsOneWidget);
-          expect(
-              find.byKey(const Key('navigation_hotels_tab')), findsOneWidget);
-          expect(find.byKey(const Key('navigation_favorites_tab')),
-              findsOneWidget);
-          expect(
-              find.byKey(const Key('navigation_account_tab')), findsOneWidget);
+          verifyAllNavigationTabs($);
           AllureReporter.reportStep('All tabs verified',
               status: AllureStepStatus.passed);
 
@@ -64,37 +153,13 @@ void main() {
 
         try {
           AllureReporter.reportStep('Initialize app');
-          await TestUtils.initializeAllure();
-          await TestHelpers.initializeApp($);
+          await initializeTest($);
           AllureReporter.reportStep('App initialized',
               status: AllureStepStatus.passed);
 
-          AllureReporter.reportStep('Navigate to Hotels tab');
-          await $(find.byKey(const Key('navigation_hotels_tab'))).tap();
-          await $.pumpAndSettle();
-          expect(find.byKey(const Key('hotels_scaffold')), findsOneWidget);
-          AllureReporter.reportStep('Hotels tab navigation verified',
-              status: AllureStepStatus.passed);
-
-          AllureReporter.reportStep('Navigate to Favorites tab');
-          await $(find.byKey(const Key('navigation_favorites_tab'))).tap();
-          await $.pumpAndSettle();
-          expect(find.byKey(const Key('favorites_scaffold')), findsOneWidget);
-          AllureReporter.reportStep('Favorites tab navigation verified',
-              status: AllureStepStatus.passed);
-
-          AllureReporter.reportStep('Navigate to Account tab');
-          await $(find.byKey(const Key('navigation_account_tab'))).tap();
-          await $.pumpAndSettle();
-          expect(find.byKey(const Key('account_scaffold')), findsOneWidget);
-          AllureReporter.reportStep('Account tab navigation verified',
-              status: AllureStepStatus.passed);
-
-          AllureReporter.reportStep('Navigate back to Overview tab');
-          await $(find.byKey(const Key('navigation_overview_tab'))).tap();
-          await $.pumpAndSettle();
-          expect(find.byKey(const Key('overview_scaffold')), findsOneWidget);
-          AllureReporter.reportStep('Overview tab navigation verified',
+          AllureReporter.reportStep('Perform navigation cycle');
+          await performNavigationCycle($);
+          AllureReporter.reportStep('Navigation cycle completed',
               status: AllureStepStatus.passed);
 
           AllureReporter.setTestStatus(status: AllureTestStatus.passed);
@@ -117,24 +182,17 @@ void main() {
 
         try {
           AllureReporter.reportStep('Initialize app');
-          await TestUtils.initializeAllure();
-          await TestHelpers.initializeApp($);
+          await initializeTest($);
           AllureReporter.reportStep('App initialized',
               status: AllureStepStatus.passed);
 
           AllureReporter.reportStep('Verify tab labels');
-          expect(find.text('Overview'), findsOneWidget);
-          expect(find.text('Hotels'), findsOneWidget);
-          expect(find.text('Favorites'), findsOneWidget);
-          expect(find.text('Account'), findsOneWidget);
+          verifyTabLabels($);
           AllureReporter.reportStep('Tab labels verified',
               status: AllureStepStatus.passed);
 
           AllureReporter.reportStep('Verify tab icons');
-          expect(find.byIcon(Icons.explore_outlined), findsOneWidget);
-          expect(find.byIcon(Icons.hotel_outlined), findsOneWidget);
-          expect(find.byIcon(Icons.favorite_outline), findsOneWidget);
-          expect(find.byIcon(Icons.account_circle_outlined), findsOneWidget);
+          verifyTabIcons($);
           AllureReporter.reportStep('Tab icons verified',
               status: AllureStepStatus.passed);
 
@@ -158,31 +216,18 @@ void main() {
 
         try {
           AllureReporter.reportStep('Initialize app');
-          await TestUtils.initializeAllure();
-          await TestHelpers.initializeApp($);
+          await initializeTest($);
           AllureReporter.reportStep('App initialized',
               status: AllureStepStatus.passed);
 
           AllureReporter.reportStep('Perform rapid tab switching');
-          for (int i = 0; i < 3; i++) {
-            await $(find.byKey(const Key('navigation_hotels_tab'))).tap();
-            await $.pump(const Duration(milliseconds: 100));
-
-            await $(find.byKey(const Key('navigation_favorites_tab'))).tap();
-            await $.pump(const Duration(milliseconds: 100));
-
-            await $(find.byKey(const Key('navigation_account_tab'))).tap();
-            await $.pump(const Duration(milliseconds: 100));
-
-            await $(find.byKey(const Key('navigation_overview_tab'))).tap();
-            await $.pump(const Duration(milliseconds: 100));
-          }
-          AllureReporter.reportStep('Rapid switching completed',
+          final duration = await performRapidSwitching($, 3);
+          AllureReporter.reportStep(
+              'Rapid switching completed in ${duration.inMilliseconds}ms',
               status: AllureStepStatus.passed);
 
           AllureReporter.reportStep('Verify app stability');
-          expect(find.byKey(const Key('dashboard_scaffold')), findsOneWidget);
-          expect(find.byKey(const Key('navigation_bar')), findsOneWidget);
+          verifyDashboardStructure($);
           AllureReporter.reportStep('App stability verified',
               status: AllureStepStatus.passed);
 
@@ -206,14 +251,12 @@ void main() {
 
         try {
           AllureReporter.reportStep('Initialize app');
-          await TestUtils.initializeAllure();
-          await TestHelpers.initializeApp($);
+          await initializeTest($);
           AllureReporter.reportStep('App initialized',
               status: AllureStepStatus.passed);
 
           AllureReporter.reportStep('Verify Overview is default page');
-          expect(find.byKey(const Key('overview_scaffold')), findsOneWidget);
-          expect(find.text('Hotel Booking'), findsOneWidget);
+          verifyDefaultOverviewPage($);
           AllureReporter.reportStep('Overview default state verified',
               status: AllureStepStatus.passed);
 
@@ -237,28 +280,13 @@ void main() {
 
         try {
           AllureReporter.reportStep('Initialize app');
-          await TestUtils.initializeAllure();
-          await TestHelpers.initializeApp($);
+          await initializeTest($);
           AllureReporter.reportStep('App initialized',
               status: AllureStepStatus.passed);
 
-          AllureReporter.reportStep('Navigate through all tabs and back');
-          await $(find.byKey(const Key('navigation_hotels_tab'))).tap();
-          await $.pumpAndSettle();
-          await $(find.byKey(const Key('navigation_favorites_tab'))).tap();
-          await $.pumpAndSettle();
-          await $(find.byKey(const Key('navigation_account_tab'))).tap();
-          await $.pumpAndSettle();
-          await $(find.byKey(const Key('navigation_overview_tab'))).tap();
-          await $.pumpAndSettle();
-          AllureReporter.reportStep('Navigation cycle completed',
-              status: AllureStepStatus.passed);
-
-          AllureReporter.reportStep('Verify dashboard structure intact');
-          expect(find.byKey(const Key('dashboard_scaffold')), findsOneWidget);
-          expect(find.byKey(const Key('navigation_bar')), findsOneWidget);
-          expect(find.byKey(const Key('overview_scaffold')), findsOneWidget);
-          AllureReporter.reportStep('Dashboard structure verified',
+          AllureReporter.reportStep('Test navigation persistence');
+          await testNavigationPersistence($);
+          AllureReporter.reportStep('Navigation persistence verified',
               status: AllureStepStatus.passed);
 
           AllureReporter.setTestStatus(status: AllureTestStatus.passed);

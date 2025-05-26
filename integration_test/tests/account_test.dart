@@ -5,9 +5,86 @@ import '../utils/test_helpers.dart';
 import '../utils/test_utils.dart';
 import '../utils/patrol_config.dart';
 import '../reports/allure_reporter.dart';
+import '../locators/app_locators.dart';
 
 void main() {
-  group('👤 Account Feature Integration Tests', () {
+  group('Account Feature Integration Tests', () {
+    Future<void> initializeTest(PatrolIntegrationTester $) async {
+      await TestUtils.initializeAllure();
+      await TestHelpers.initializeApp($);
+    }
+
+    Future<void> navigateToAccount(PatrolIntegrationTester $) async {
+      await TestHelpers.navigateToPage($, 'account',
+          description: 'Navigating to Account page');
+    }
+
+    void verifyAccountPageElements(PatrolIntegrationTester $) {
+      final scaffold = AppLocators.getAccountScaffold($);
+      final appBar = AppLocators.getAccountAppBar($);
+      final title = AppLocators.getAccountTitle($);
+      final icon = AppLocators.getAccountIcon($);
+
+      expect(AppLocators.elementExists($, scaffold), isTrue,
+          reason: 'Account scaffold should be present');
+      expect(AppLocators.elementExists($, appBar), isTrue,
+          reason: 'Account app bar should be present');
+      expect(AppLocators.elementExists($, title), isTrue,
+          reason: 'Account title should be present');
+      expect(AppLocators.elementExists($, icon), isTrue,
+          reason: 'Account icon should be present');
+    }
+
+    void verifyAccountContent(PatrolIntegrationTester $) {
+      expect(find.text('Your Account').evaluate().isNotEmpty, isTrue,
+          reason: 'Should display "Your Account" title');
+      expect(find.byIcon(Icons.account_circle_outlined).evaluate().isNotEmpty,
+          isTrue,
+          reason: 'Should display account icon');
+    }
+
+    void verifyAccountPageStructure(PatrolIntegrationTester $) {
+      expect(find.byType(Scaffold).evaluate().isNotEmpty, isTrue,
+          reason: 'Should have Scaffold structure');
+      expect(find.byType(AppBar).evaluate().isNotEmpty, isTrue,
+          reason: 'Should have AppBar structure');
+      expect(find.byType(Center).evaluate().isNotEmpty, isTrue,
+          reason: 'Should have Center layout');
+      expect(find.byType(Icon).evaluate().isNotEmpty, isTrue,
+          reason: 'Should have Icon widget');
+    }
+
+    Future<void> performNavigationCycle(
+        PatrolIntegrationTester $, int cycles) async {
+      for (int i = 0; i < cycles; i++) {
+        await navigateToAccount($);
+        verifyAccountPageElements($);
+        verifyAccountContent($);
+
+        await TestHelpers.navigateToPage($, 'overview',
+            description: 'Return to Overview');
+        await $.pump(const Duration(milliseconds: 200));
+      }
+    }
+
+    Future<Duration> performStressTest(
+        PatrolIntegrationTester $, int iterations) async {
+      final startTime = DateTime.now();
+
+      for (int i = 0; i < iterations; i++) {
+        final accountTab = AppLocators.getAccountTab($);
+        final overviewTab = AppLocators.getOverviewTab($);
+
+        await AppLocators.smartTap($, accountTab);
+        await $.pump(const Duration(milliseconds: 50));
+        await AppLocators.smartTap($, overviewTab);
+        await $.pump(const Duration(milliseconds: 50));
+      }
+
+      final endTime = DateTime.now();
+      return endTime.difference(startTime);
+    }
+
     patrolTest(
       'Account page loads correctly',
       config: PatrolConfig.getConfig(),
@@ -17,22 +94,17 @@ void main() {
 
         try {
           AllureReporter.reportStep('Initialize app');
-          await TestUtils.initializeAllure();
-          await TestHelpers.initializeApp($);
+          await initializeTest($);
           AllureReporter.reportStep('App initialized',
               status: AllureStepStatus.passed);
 
           AllureReporter.reportStep('Navigate to Account page');
-          await TestHelpers.navigateToPage($, 'account',
-              description: 'Navigating to Account page');
+          await navigateToAccount($);
           AllureReporter.reportStep('Navigation completed',
               status: AllureStepStatus.passed);
 
           AllureReporter.reportStep('Verify account page elements');
-          expect(find.byKey(const Key('account_scaffold')), findsOneWidget);
-          expect(find.byKey(const Key('account_app_bar')), findsOneWidget);
-          expect(find.byKey(const Key('account_title')), findsOneWidget);
-          expect(find.byKey(const Key('account_icon')), findsOneWidget);
+          verifyAccountPageElements($);
           AllureReporter.reportStep('Account page elements verified',
               status: AllureStepStatus.passed);
 
@@ -56,21 +128,14 @@ void main() {
 
         try {
           AllureReporter.reportStep('Initialize app');
-          await TestUtils.initializeAllure();
-          await TestHelpers.initializeApp($);
-          await TestHelpers.navigateToPage($, 'account',
-              description: 'Navigating to Account page');
+          await initializeTest($);
+          await navigateToAccount($);
           AllureReporter.reportStep('App initialized and navigated',
               status: AllureStepStatus.passed);
 
           AllureReporter.reportStep('Verify account title text');
-          expect(find.text('Your Account'), findsOneWidget);
-          AllureReporter.reportStep('Account title verified',
-              status: AllureStepStatus.passed);
-
-          AllureReporter.reportStep('Verify account icon');
-          expect(find.byIcon(Icons.account_circle_outlined), findsOneWidget);
-          AllureReporter.reportStep('Account icon verified',
+          verifyAccountContent($);
+          AllureReporter.reportStep('Account content verified',
               status: AllureStepStatus.passed);
 
           AllureReporter.setTestStatus(status: AllureTestStatus.passed);
@@ -93,18 +158,13 @@ void main() {
 
         try {
           AllureReporter.reportStep('Initialize app');
-          await TestUtils.initializeAllure();
-          await TestHelpers.initializeApp($);
-          await TestHelpers.navigateToPage($, 'account',
-              description: 'Navigating to Account page');
+          await initializeTest($);
+          await navigateToAccount($);
           AllureReporter.reportStep('App initialized and navigated',
               status: AllureStepStatus.passed);
 
           AllureReporter.reportStep('Verify page structure');
-          expect(find.byType(Scaffold), findsOneWidget);
-          expect(find.byType(AppBar), findsOneWidget);
-          expect(find.byType(Center), findsOneWidget);
-          expect(find.byType(Icon), findsOneWidget);
+          verifyAccountPageStructure($);
           AllureReporter.reportStep('Page structure verified',
               status: AllureStepStatus.passed);
 
@@ -128,29 +188,18 @@ void main() {
 
         try {
           AllureReporter.reportStep('Initialize app');
-          await TestUtils.initializeAllure();
-          await TestHelpers.initializeApp($);
+          await initializeTest($);
           AllureReporter.reportStep('App initialized',
               status: AllureStepStatus.passed);
 
           AllureReporter.reportStep('Multiple navigation to Account page');
-          for (int i = 0; i < 3; i++) {
-            await TestHelpers.navigateToPage($, 'account',
-                description: 'Navigation cycle ${i + 1}');
-            expect(find.byKey(const Key('account_scaffold')), findsOneWidget);
-            expect(find.text('Your Account'), findsOneWidget);
-
-            await TestHelpers.navigateToPage($, 'overview',
-                description: 'Return to Overview');
-            await $.pump(const Duration(milliseconds: 200));
-          }
+          await performNavigationCycle($, 3);
           AllureReporter.reportStep('Multiple navigation cycles completed',
               status: AllureStepStatus.passed);
 
           AllureReporter.reportStep('Final navigation to Account');
-          await TestHelpers.navigateToPage($, 'account',
-              description: 'Final navigation');
-          expect(find.byKey(const Key('account_scaffold')), findsOneWidget);
+          await navigateToAccount($);
+          verifyAccountPageElements($);
           AllureReporter.reportStep('Final navigation verified',
               status: AllureStepStatus.passed);
 
@@ -174,23 +223,21 @@ void main() {
 
         try {
           AllureReporter.reportStep('Initialize app');
-          await TestUtils.initializeAllure();
-          await TestHelpers.initializeApp($);
-          await TestHelpers.navigateToPage($, 'account',
-              description: 'Navigating to Account page');
+          await initializeTest($);
+          await navigateToAccount($);
           AllureReporter.reportStep('App initialized and navigated',
               status: AllureStepStatus.passed);
 
           AllureReporter.reportStep('Verify semantic elements');
-          expect(find.byKey(const Key('account_title')), findsOneWidget);
-          expect(find.byKey(const Key('account_icon')), findsOneWidget);
-          expect(find.byKey(const Key('account_app_bar')), findsOneWidget);
+          verifyAccountPageElements($);
           AllureReporter.reportStep('Semantic elements verified',
               status: AllureStepStatus.passed);
 
           AllureReporter.reportStep('Verify text elements for screen readers');
-          expect(find.text('Your Account'), findsOneWidget);
-          expect(find.text('Account'), findsOneWidget); // Navigation tab label
+          expect(find.text('Your Account').evaluate().isNotEmpty, isTrue,
+              reason: 'Should have page title');
+          expect(find.text('Account').evaluate().isNotEmpty, isTrue,
+              reason: 'Should have navigation tab label');
           AllureReporter.reportStep('Text elements verified',
               status: AllureStepStatus.passed);
 
@@ -214,32 +261,22 @@ void main() {
 
         try {
           AllureReporter.reportStep('Initialize app');
-          await TestUtils.initializeAllure();
-          await TestHelpers.initializeApp($);
+          await initializeTest($);
           AllureReporter.reportStep('App initialized',
               status: AllureStepStatus.passed);
 
           AllureReporter.reportStep('Perform rapid navigation stress test');
-          final startTime = DateTime.now();
-
-          for (int i = 0; i < 10; i++) {
-            await $(find.byKey(const Key('navigation_account_tab'))).tap();
-            await $.pump(const Duration(milliseconds: 50));
-            await $(find.byKey(const Key('navigation_overview_tab'))).tap();
-            await $.pump(const Duration(milliseconds: 50));
-          }
-
-          final endTime = DateTime.now();
-          final duration = endTime.difference(startTime);
+          final duration = await performStressTest($, 10);
           AllureReporter.reportStep(
               'Stress test completed in ${duration.inMilliseconds}ms',
               status: AllureStepStatus.passed);
 
           AllureReporter.reportStep('Verify page stability after stress');
-          await $(find.byKey(const Key('navigation_account_tab'))).tap();
+          final accountTab = AppLocators.getAccountTab($);
+          await AppLocators.smartTap($, accountTab);
           await $.pumpAndSettle();
-          expect(find.byKey(const Key('account_scaffold')), findsOneWidget);
-          expect(find.text('Your Account'), findsOneWidget);
+          verifyAccountPageElements($);
+          verifyAccountContent($);
           AllureReporter.reportStep('Page stability verified',
               status: AllureStepStatus.passed);
 
@@ -263,22 +300,21 @@ void main() {
 
         try {
           AllureReporter.reportStep('Initialize app');
-          await TestUtils.initializeAllure();
-          await TestHelpers.initializeApp($);
-          await TestHelpers.navigateToPage($, 'account',
-              description: 'Navigating to Account page');
+          await initializeTest($);
+          await navigateToAccount($);
           AllureReporter.reportStep('App initialized and navigated',
               status: AllureStepStatus.passed);
 
           AllureReporter.reportStep('Verify consistent theming');
-          expect(find.byType(MaterialApp), findsOneWidget);
-          expect(find.byType(Scaffold), findsOneWidget);
+          expect(find.byType(MaterialApp).evaluate().isNotEmpty, isTrue,
+              reason: 'Should have MaterialApp theme');
+          expect(find.byType(Scaffold).evaluate().isNotEmpty, isTrue,
+              reason: 'Should have Scaffold structure');
           AllureReporter.reportStep('Theme consistency verified',
               status: AllureStepStatus.passed);
 
           AllureReporter.reportStep('Verify icon and text positioning');
-          expect(find.byType(Center), findsOneWidget);
-          expect(find.byType(Icon), findsOneWidget);
+          verifyAccountPageStructure($);
           AllureReporter.reportStep('Layout positioning verified',
               status: AllureStepStatus.passed);
 

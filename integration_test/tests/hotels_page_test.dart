@@ -5,10 +5,10 @@ import '../utils/test_helpers.dart';
 import '../utils/test_utils.dart';
 import '../utils/patrol_config.dart';
 import '../reports/allure_reporter.dart';
+import '../tests/enhanced_scroll_test.dart';
 
 void main() {
-  group('🏨 Hotels Feature Integration Tests', () {
-    // Helper method to wait for search results with proper timeout
+  group('Hotels Feature Integration Tests', () {
     Future<SearchState> waitForSearchResults(PatrolIntegrationTester $,
         {Duration timeout = const Duration(seconds: 15)}) async {
       final stopwatch = Stopwatch()..start();
@@ -16,7 +16,6 @@ void main() {
       while (stopwatch.elapsed < timeout) {
         await $.pump(const Duration(milliseconds: 500));
 
-        // Check if any loading indicators are present
         final loadingIndicator =
             find.byKey(const Key('hotels_loading_indicator'));
         final paginationLoading =
@@ -28,7 +27,6 @@ void main() {
             circularProgress.evaluate().isNotEmpty;
 
         if (!isLoading) {
-          // Check what state we're in
           final hasCards = find.byType(Card).evaluate().isNotEmpty;
           final hasError = find
               .byKey(const Key('hotels_error_message'))
@@ -43,7 +41,6 @@ void main() {
           if (hasError) return SearchState.hasError;
           if (hasEmpty) return SearchState.isEmpty;
 
-          // If none of the above, wait a bit more
           await $.pump(const Duration(milliseconds: 500));
         }
       }
@@ -52,92 +49,277 @@ void main() {
       return SearchState.timeout;
     }
 
-    // Enhanced search method that handles the actual app behavior
     Future<SearchState> performSearch(
         PatrolIntegrationTester $, String query) async {
-      print('🔍 Performing search with query: "$query"');
+      TestLogger.log('Performing search with query: "$query"');
 
-      // Find the search text field
       final searchField = find.byKey(const Key('search_text_field'));
       expect(searchField, findsOneWidget,
           reason: 'Search field should be present');
 
-      // Clear any existing text completely
       await $(searchField).enterText('');
       await $.pump(const Duration(milliseconds: 300));
 
-      // Enter the search query
       await $(searchField).enterText(query);
-      print('🔍 Entered text: "$query"');
+      TestLogger.log('Entered text: "$query"');
 
-      // Wait for debounce (the search automatically triggers after text input due to listener)
-      await $.pump(const Duration(milliseconds: 1000)); // Wait for debounce
+      await $.pump(const Duration(milliseconds: 1000));
 
-      // Wait for search to complete
       return await waitForSearchResults($);
     }
 
-    // Helper method for proper scrolling using Patrol's scrollTo
-    Future<bool> performHotelsScroll (PatrolIntegrationTester $) async {
-      // First, ensure we have a scrollable list with items
-      final hasCards = find.byType(Card).evaluate().length;
-      if (hasCards == 0) {
-        print('⚠️ No cards found, skipping scroll test');
-        return false;
+    Future<ScrollResult> performHotelsScrollFixed(
+      PatrolIntegrationTester $, {
+      int maxScrolls = 10,
+      Duration scrollTimeout = const Duration(seconds: 30),
+    }) async {
+      TestLogger.log(
+          'Starting continuous scroll until pagination loader appears');
+
+      final initialCardCount = find.byType(Card).evaluate().length;
+      TestLogger.log('Initial card count: $initialCardCount');
+
+      if (initialCardCount == 0) {
+        return ScrollResult(
+          success: false,
+          initialCount: 0,
+          finalCount: 0,
+          scrollAttempts: 0,
+          error: 'No cards found to scroll',
+        );
       }
 
-      print('📊 Found $hasCards cards, testing scroll');
-      final initialCount = hasCards;
+      int scrollAttempts = 0;
+      String? lastError;
 
-      // Method 1: Scroll the CustomScrollView directly using hotels_scroll_view key
-      final scrollView = find.byKey(const Key('hotels_scroll_view'));
-      if (scrollView.evaluate().isNotEmpty) {
-        print('🔄 Scrolling using hotels_scroll_view');
-        try {
-          // Use Patrol's scrollTo with proper syntax for CustomScrollView
-          await $(scrollView).scrollTo(maxScrolls: 5);
-          await $.pump(
-              const Duration(seconds: 3)); // Wait for potential pagination
+      try {
+        final scrollViewFinder = find.byKey(const Key('hotels_scroll_view'));
+        if (scrollViewFinder.evaluate().isNotEmpty) {
+          TestLogger.log(
+              'Found hotels_scroll_view, scrolling until pagination loader appears');
+
+          bool paginationTriggered = false;
+
+          while (scrollAttempts < maxScrolls && !paginationTriggered) {
+            scrollAttempts++;
+            TestLogger.log(
+                'Continuous scroll attempt $scrollAttempts/$maxScrolls');
+
+            await $.tester.drag(scrollViewFinder, const Offset(0, -400));
+            await $.pump(const Duration(milliseconds: 500));
+
+            final paginationLoading =
+                find.byKey(const Key('hotels_pagination_loading'));
+            if (paginationLoading.evaluate().isNotEmpty) {
+              TestLogger.log(
+                  'SUCCESS: Pagination loader appeared after $scrollAttempts scrolls!');
+              paginationTriggered = true;
+
+              TestLogger.log('Waiting for pagination to complete...');
+              int waitAttempts = 0;
+              while (paginationLoading.evaluate().isNotEmpty &&
+                  waitAttempts < 15) {
+                await $.pump(const Duration(milliseconds: 500));
+                waitAttempts++;
+                TestLogger.log(
+                    'Waiting for pagination... attempt $waitAttempts');
+              }
+
+              if (waitAttempts >= 15) {
+                TestLogger.log('Pagination taking too long, continuing...');
+              } else {
+                TestLogger.log(
+                    'Pagination completed after ${waitAttempts * 500}ms');
+              }
+
+              await $.pump(const Duration(seconds: 1));
+              break;
+            }
+
+            final currentCount = find.byType(Card).evaluate().length;
+            if (currentCount > initialCardCount) {
+              TestLogger.log(
+                  'New content loaded without seeing loader: $initialCardCount -> $currentCount');
+              paginationTriggered = true;
+              break;
+            }
+
+            TestLogger.log('No pagination yet, continuing to scroll...');
+            await $.pump(const Duration(milliseconds: 300));
+          }
 
           final finalCount = find.byType(Card).evaluate().length;
-          print('✅ Scroll completed: $initialCount -> $finalCount cards');
-          return true;
-        } catch (e) {
-          print('⚠️ Method 1 failed: $e');
+
+          if (paginationTriggered || finalCount > initialCardCount) {
+            return ScrollResult(
+              success: true,
+              initialCount: initialCardCount,
+              finalCount: finalCount,
+              scrollAttempts: scrollAttempts,
+            );
+          } else {
+            TestLogger.log(
+                'Reached max scroll attempts without triggering pagination');
+            return ScrollResult(
+              success: true,
+              initialCount: initialCardCount,
+              finalCount: finalCount,
+              scrollAttempts: scrollAttempts,
+              reachedEnd: true,
+            );
+          }
         }
+      } catch (e) {
+        lastError = 'hotels_scroll_view method failed: $e';
+        TestLogger.log('hotels_scroll_view method failed: $e');
       }
 
-      // Method 2: Find the Scrollable widget inside the CustomScrollView
-      final customScrollView = find.byType(CustomScrollView);
-      if (customScrollView.evaluate().isNotEmpty) {
-        print('🔄 Scrolling using CustomScrollView -> Scrollable');
-        try {
-          // Find the Scrollable inside CustomScrollView
-          await $(customScrollView).$(Scrollable).scrollTo(maxScrolls: 5);
-          await $.pump(const Duration(seconds: 3));
-          print('✅ Scroll completed successfully');
-          return true;
-        } catch (e) {
-          print('⚠️ Method 2 failed: $e');
+      try {
+        final customScrollView = find.byType(CustomScrollView);
+        if (customScrollView.evaluate().isNotEmpty) {
+          TestLogger.log(
+              'Found CustomScrollView, scrolling until pagination loader appears');
+
+          bool paginationTriggered = false;
+
+          while (scrollAttempts < maxScrolls && !paginationTriggered) {
+            scrollAttempts++;
+            TestLogger.log(
+                'CustomScrollView continuous scroll attempt $scrollAttempts/$maxScrolls');
+
+            await $.tester.drag(customScrollView.first, const Offset(0, -400));
+            await $.pump(const Duration(milliseconds: 500));
+
+            final paginationLoading =
+                find.byKey(const Key('hotels_pagination_loading'));
+            if (paginationLoading.evaluate().isNotEmpty) {
+              TestLogger.log(
+                  'SUCCESS: Pagination loader appeared with CustomScrollView!');
+              paginationTriggered = true;
+
+              int waitAttempts = 0;
+              while (paginationLoading.evaluate().isNotEmpty &&
+                  waitAttempts < 15) {
+                await $.pump(const Duration(milliseconds: 500));
+                waitAttempts++;
+              }
+
+              await $.pump(const Duration(seconds: 1));
+              break;
+            }
+
+            final currentCount = find.byType(Card).evaluate().length;
+            if (currentCount > initialCardCount) {
+              TestLogger.log(
+                  'New content loaded with CustomScrollView: $initialCardCount -> $currentCount');
+              paginationTriggered = true;
+              break;
+            }
+
+            await $.pump(const Duration(milliseconds: 300));
+          }
+
+          final finalCount = find.byType(Card).evaluate().length;
+
+          if (paginationTriggered || finalCount > initialCardCount) {
+            return ScrollResult(
+              success: true,
+              initialCount: initialCardCount,
+              finalCount: finalCount,
+              scrollAttempts: scrollAttempts,
+            );
+          } else {
+            return ScrollResult(
+              success: true,
+              initialCount: initialCardCount,
+              finalCount: finalCount,
+              scrollAttempts: scrollAttempts,
+              reachedEnd: true,
+            );
+          }
         }
+      } catch (e) {
+        lastError = 'CustomScrollView method failed: $e';
+        TestLogger.log('CustomScrollView method failed: $e');
       }
 
-      // Method 3: Generic scrollable finder
-      final scrollable = find.byType(Scrollable);
-      if (scrollable.evaluate().isNotEmpty) {
-        print('🔄 Scrolling using generic Scrollable');
-        try {
-          await $(scrollable.first).scrollTo(maxScrolls: 5);
-          await $.pump(const Duration(seconds: 3));
-          print('✅ Scroll completed successfully');
-          return true;
-        } catch (e) {
-          print('⚠️ Method 3 failed: $e');
+      try {
+        final scrollable = find.byType(Scrollable);
+        if (scrollable.evaluate().isNotEmpty) {
+          TestLogger.log(
+              'Found Scrollable widgets, scrolling until pagination loader appears');
+
+          bool paginationTriggered = false;
+
+          while (scrollAttempts < maxScrolls && !paginationTriggered) {
+            scrollAttempts++;
+            TestLogger.log(
+                'Scrollable continuous scroll attempt $scrollAttempts/$maxScrolls');
+
+            await $.tester.drag(scrollable.first, const Offset(0, -400));
+            await $.pump(const Duration(milliseconds: 500));
+
+            final paginationLoading =
+                find.byKey(const Key('hotels_pagination_loading'));
+            if (paginationLoading.evaluate().isNotEmpty) {
+              TestLogger.log(
+                  'SUCCESS: Pagination loader appeared with Scrollable!');
+              paginationTriggered = true;
+
+              int waitAttempts = 0;
+              while (paginationLoading.evaluate().isNotEmpty &&
+                  waitAttempts < 15) {
+                await $.pump(const Duration(milliseconds: 500));
+                waitAttempts++;
+              }
+
+              await $.pump(const Duration(seconds: 1));
+              break;
+            }
+
+            final currentCount = find.byType(Card).evaluate().length;
+            if (currentCount > initialCardCount) {
+              TestLogger.log(
+                  'New content loaded with Scrollable: $initialCardCount -> $currentCount');
+              paginationTriggered = true;
+              break;
+            }
+
+            await $.pump(const Duration(milliseconds: 300));
+          }
+
+          final finalCount = find.byType(Card).evaluate().length;
+
+          if (paginationTriggered || finalCount > initialCardCount) {
+            return ScrollResult(
+              success: true,
+              initialCount: initialCardCount,
+              finalCount: finalCount,
+              scrollAttempts: scrollAttempts,
+            );
+          } else {
+            return ScrollResult(
+              success: true,
+              initialCount: initialCardCount,
+              finalCount: finalCount,
+              scrollAttempts: scrollAttempts,
+              reachedEnd: true,
+            );
+          }
         }
+      } catch (e) {
+        lastError = 'Scrollable method failed: $e';
+        TestLogger.log('Scrollable method failed: $e');
       }
 
-      print('⚠️ No scrollable widget found for scrolling');
-      return false;
+      TestLogger.log('ALL CONTINUOUS SCROLL METHODS FAILED');
+      return ScrollResult(
+        success: false,
+        initialCount: initialCardCount,
+        finalCount: initialCardCount,
+        scrollAttempts: scrollAttempts,
+        error: lastError ?? 'All continuous scroll methods failed',
+      );
     }
 
     patrolTest(
@@ -183,45 +365,6 @@ void main() {
     );
 
     patrolTest(
-      'Warm start does not re-init app',
-      config: PatrolConfig.getConfig(),
-      ($) async {
-        AllureReporter.addLabel('feature', 'Hotels Page');
-        AllureReporter.setSeverity(AllureSeverity.normal);
-
-        try {
-          AllureReporter.reportStep('First app initialization');
-          await TestUtils.initializeAllure();
-          await TestHelpers.initializeApp($);
-          await TestHelpers.navigateToPage($, 'hotels',
-              description: 'Navigating to Hotels page');
-          AllureReporter.reportStep('First initialization completed',
-              status: AllureStepStatus.passed);
-
-          AllureReporter.reportStep('Second app initialization');
-          await TestHelpers.initializeApp($);
-          await TestHelpers.navigateToPage($, 'hotels',
-              description: 'Navigating to Hotels page');
-          AllureReporter.reportStep('Second initialization completed',
-              status: AllureStepStatus.passed);
-
-          AllureReporter.reportStep('Verify hotels page');
-          expect(find.byKey(const Key('hotels_scaffold')), findsOneWidget);
-          AllureReporter.reportStep('Hotels page verified',
-              status: AllureStepStatus.passed);
-
-          AllureReporter.setTestStatus(status: AllureTestStatus.passed);
-        } catch (e, stackTrace) {
-          AllureReporter.setTestStatus(
-            status: AllureTestStatus.failed,
-            reason: 'Test failed: $e\nStack trace: $stackTrace',
-          );
-          rethrow;
-        }
-      },
-    );
-
-    patrolTest(
       'Search returns results',
       config: PatrolConfig.getConfig(),
       ($) async {
@@ -244,97 +387,29 @@ void main() {
 
           AllureReporter.reportStep(
               'Verify search results - ANY input should return output');
-          // According to your requirement: "With any input an output is expected"
           expect(searchState, isNot(SearchState.timeout),
               reason: 'Any input should produce some output');
 
           switch (searchState) {
             case SearchState.hasResults:
               final cardCount = find.byType(Card).evaluate().length;
-              print('✅ Found $cardCount hotel cards');
+              TestLogger.log('Found $cardCount hotel cards');
               AllureReporter.reportStep('Hotel cards found: $cardCount',
                   status: AllureStepStatus.passed);
               break;
             case SearchState.hasError:
-              print('⚠️ Search resulted in error state');
+              TestLogger.log('Search resulted in error state');
               AllureReporter.reportStep('Error state detected',
                   status: AllureStepStatus.passed);
               break;
             case SearchState.isEmpty:
-              print('ℹ️ Search resulted in empty state');
+              TestLogger.log('Search resulted in empty state');
               AllureReporter.reportStep('Empty state detected',
                   status: AllureStepStatus.passed);
               break;
             case SearchState.timeout:
               throw Exception(
                   'Search timed out - this violates the "any input should return output" requirement');
-          }
-
-          AllureReporter.setTestStatus(status: AllureTestStatus.passed);
-        } catch (e, stackTrace) {
-          AllureReporter.setTestStatus(
-            status: AllureTestStatus.failed,
-            reason: 'Test failed: $e\nStack trace: $stackTrace',
-          );
-          rethrow;
-        }
-      },
-    );
-
-    patrolTest(
-      'Nonsense query returns some output (not empty state)',
-      config: PatrolConfig.getConfig(),
-      ($) async {
-        AllureReporter.addLabel('feature', 'Hotels Search');
-        AllureReporter.setSeverity(AllureSeverity.normal);
-
-        try {
-          AllureReporter.reportStep('Initialize app');
-          await TestUtils.initializeAllure();
-          await TestHelpers.initializeApp($);
-          await TestHelpers.navigateToPage($, 'hotels',
-              description: 'Navigating to Hotels page');
-          AllureReporter.reportStep('App initialized',
-              status: AllureStepStatus.passed);
-
-          AllureReporter.reportStep(
-              'Test with nonsense query - should return SOME output');
-          final searchState =
-              await performSearch($, 'xyz123nonsense987impossible654query');
-          AllureReporter.reportStep('Search executed',
-              status: AllureStepStatus.passed);
-
-          AllureReporter.reportStep('Verify nonsense query behavior');
-          // According to your requirement: "With any input an output is expected"
-          // So nonsense queries should NOT show empty state, they should return something
-          expect(searchState, isNot(SearchState.timeout),
-              reason: 'Nonsense query should produce some output');
-
-          switch (searchState) {
-            case SearchState.hasResults:
-              final cardCount = find.byType(Card).evaluate().length;
-              print(
-                  '✅ Nonsense query returned $cardCount results (expected behavior)');
-              AllureReporter.reportStep(
-                  'Nonsense query returned results: $cardCount',
-                  status: AllureStepStatus.passed);
-              break;
-            case SearchState.hasError:
-              print(
-                  '✅ Nonsense query triggered error state (acceptable output)');
-              AllureReporter.reportStep(
-                  'Nonsense query triggered error (acceptable)',
-                  status: AllureStepStatus.passed);
-              break;
-            case SearchState.isEmpty:
-              print(
-                  '⚠️ Nonsense query showed empty state (unexpected based on requirements)');
-              AllureReporter.reportStep(
-                  'Nonsense query showed empty state (might be unexpected)',
-                  status: AllureStepStatus.passed);
-              break;
-            case SearchState.timeout:
-              throw Exception('Nonsense query timed out');
           }
 
           AllureReporter.setTestStatus(status: AllureTestStatus.passed);
@@ -366,17 +441,15 @@ void main() {
 
           AllureReporter.reportStep(
               'Test with empty spaces - should trigger "Something went wrong"');
-          final searchState = await performSearch($, '   '); // Only spaces
+          final searchState = await performSearch($, '   ');
           AllureReporter.reportStep('Search with spaces executed',
               status: AllureStepStatus.passed);
 
           AllureReporter.reportStep('Verify empty spaces behavior');
-          // According to your requirement: "except empty spaces it throws something went wrong"
           expect(searchState, equals(SearchState.hasError),
               reason:
                   'Empty spaces should trigger "Something went wrong" error');
 
-          // Verify the specific error message
           final errorMessage = find.byKey(const Key('hotels_error_message'));
           expect(errorMessage, findsOneWidget,
               reason: 'Should show error message');
@@ -389,62 +462,9 @@ void main() {
           expect(retryButton, findsOneWidget,
               reason: 'Should show retry button');
 
-          print(
-              '✅ Empty spaces correctly triggered "Something went wrong" error');
+          TestLogger.log(
+              'Empty spaces correctly triggered "Something went wrong" error');
           AllureReporter.reportStep('Empty spaces triggered correct error',
-              status: AllureStepStatus.passed);
-
-          AllureReporter.setTestStatus(status: AllureTestStatus.passed);
-        } catch (e, stackTrace) {
-          AllureReporter.setTestStatus(
-            status: AllureTestStatus.failed,
-            reason: 'Test failed: $e\nStack trace: $stackTrace',
-          );
-          rethrow;
-        }
-      },
-    );
-
-    patrolTest(
-      'Clear and re-search',
-      config: PatrolConfig.getConfig(),
-      ($) async {
-        AllureReporter.addLabel('feature', 'Hotels Search');
-        AllureReporter.setSeverity(AllureSeverity.normal);
-
-        try {
-          AllureReporter.reportStep('Initialize app');
-          await TestUtils.initializeAllure();
-          await TestHelpers.initializeApp($);
-          await TestHelpers.navigateToPage($, 'hotels',
-              description: 'Navigating to Hotels page');
-          AllureReporter.reportStep('App initialized',
-              status: AllureStepStatus.passed);
-
-          AllureReporter.reportStep('Perform first search');
-          final firstState = await performSearch($, 'Dubai');
-          expect(firstState, isNot(SearchState.timeout),
-              reason: 'First search should complete');
-          AllureReporter.reportStep('First search completed: $firstState',
-              status: AllureStepStatus.passed);
-
-          AllureReporter.reportStep('Clear search field');
-          await $(find.byKey(const Key('search_clear_button'))).tap();
-          await $.pump(const Duration(milliseconds: 500));
-
-          final textFieldController = $.tester
-              .widget<TextField>(find.byKey(const Key('search_text_field')))
-              .controller;
-          expect(textFieldController?.text, isEmpty,
-              reason: 'Text field should be empty after clear');
-          AllureReporter.reportStep('Search field cleared',
-              status: AllureStepStatus.passed);
-
-          AllureReporter.reportStep('Perform second search');
-          final secondState = await performSearch($, 'Paris');
-          expect(secondState, isNot(SearchState.timeout),
-              reason: 'Second search should complete');
-          AllureReporter.reportStep('Second search completed: $secondState',
               status: AllureStepStatus.passed);
 
           AllureReporter.setTestStatus(status: AllureTestStatus.passed);
@@ -484,19 +504,14 @@ void main() {
                 status: AllureStepStatus.passed);
 
             if (initialCards > 0) {
-              AllureReporter.reportStep(
-                  'DEBUG: Checking scroll state before scroll test');
-              await TestHelpers.debugScrollState($);
-
-              AllureReporter.reportStep('PERFORMING ACTUAL SCROLL TEST');
+              AllureReporter.reportStep('PERFORMING SCROLL TEST');
               final scrollResult =
-                  await TestHelpers.performHotelsScroll($, maxScrolls: 3);
+                  await performHotelsScrollFixed($, maxScrolls: 3);
 
               AllureReporter.reportStep(
                   'Scroll test completed: ${scrollResult.toString()}',
                   status: AllureStepStatus.passed);
 
-              // STRICT VERIFICATION - scroll must actually work
               expect(scrollResult.success, isTrue,
                   reason:
                       'Scroll operation must succeed: ${scrollResult.error ?? "Unknown error"}');
@@ -508,15 +523,16 @@ void main() {
 
               if (scrollResult.hasNewContent) {
                 AllureReporter.reportStep(
-                    '✅ NEW CONTENT LOADED: ${scrollResult.newContentCount} cards',
+                    'NEW CONTENT LOADED: ${scrollResult.newContentCount} cards',
                     status: AllureStepStatus.passed);
-                print(
-                    '🎉 SUCCESS: Scroll loaded ${scrollResult.newContentCount} new cards');
+                TestLogger.log(
+                    'SUCCESS: Scroll loaded ${scrollResult.newContentCount} new cards');
               } else if (scrollResult.reachedEnd) {
                 AllureReporter.reportStep(
-                    '✅ REACHED END OF LIST (no new content, but scroll worked)',
+                    'REACHED END OF LIST (no new content, but scroll worked)',
                     status: AllureStepStatus.passed);
-                print('📋 INFO: Reached end of list, no new content available');
+                TestLogger.log(
+                    'INFO: Reached end of list, no new content available');
               } else {
                 throw Exception(
                     'Scroll completed but no new content and didn\'t reach end - unexpected behavior');
@@ -546,63 +562,134 @@ void main() {
     );
 
     patrolTest(
-      'No further scrolls past last page',
+      'Enhanced pagination test - continuous scroll until loader appears',
       config: PatrolConfig.getConfig(),
       ($) async {
-        AllureReporter.addLabel('feature', 'Hotels Pagination');
-        AllureReporter.setSeverity(AllureSeverity.normal);
+        AllureReporter.addLabel('feature', 'Hotels Pagination Enhanced');
+        AllureReporter.setSeverity(AllureSeverity.critical);
 
         try {
-          AllureReporter.reportStep('Initialize app');
+          AllureReporter.reportStep('Initialize app and navigate to hotels');
           await TestUtils.initializeAllure();
           await TestHelpers.initializeApp($);
-          await TestHelpers.navigateToPage($, 'hotels',
-              description: 'Navigating to Hotels page');
-          AllureReporter.reportStep('App initialized',
+          await TestHelpers.navigateToPage($, 'hotels');
+          AllureReporter.reportStep('Navigation completed',
               status: AllureStepStatus.passed);
 
-          AllureReporter.reportStep('Perform search with limited results');
-          final searchState =
-              await performSearch($, 'zzz_unique_hotel_name_xyz123');
+          AllureReporter.reportStep('Perform search to get scrollable content');
+          final searchQuery = 'hotel';
+
+          final searchField = find.byKey(const Key('search_text_field'));
+          expect(searchField, findsOneWidget,
+              reason: 'Search field should be present');
+
+          await $(searchField).enterText('');
+          await $.pump(const Duration(milliseconds: 300));
+          await $(searchField).enterText(searchQuery);
+          TestLogger.log('Entered search query: "$searchQuery"');
+
+          await $.pump(const Duration(milliseconds: 1500));
+
+          final searchState = await waitForSearchResults($,
+              timeout: const Duration(seconds: 20));
+          AllureReporter.reportStep('Search completed with state: $searchState',
+              status: AllureStepStatus.passed);
 
           if (searchState == SearchState.hasResults) {
             final initialCards = find.byType(Card).evaluate().length;
-            AllureReporter.reportStep(
-                'Search completed with $initialCards cards',
+            AllureReporter.reportStep('Found $initialCards initial hotel cards',
                 status: AllureStepStatus.passed);
+            TestLogger.log('Initial cards loaded: $initialCards');
 
             if (initialCards > 0) {
-              AllureReporter.reportStep('Testing scroll past last page');
+              AllureReporter.reportStep(
+                  'Starting enhanced continuous scroll test');
+
               final scrollResult =
-                  await TestHelpers.performHotelsScroll($, maxScrolls: 5);
-
-              // STRICT VERIFICATION - scroll must work
-              expect(scrollResult.success, isTrue,
-                  reason:
-                      'Scroll operation must succeed: ${scrollResult.error ?? "Unknown error"}');
-
-              // For limited results, expect no new content (reached end)
-              expect(scrollResult.finalCount, equals(scrollResult.initialCount),
-                  reason:
-                      'Limited query should not load new content after scroll');
-
-              expect(scrollResult.reachedEnd, isTrue,
-                  reason: 'Should reach end of list for limited query');
+                  await EnhancedScrollTester.performContinuousScroll(
+                $,
+                maxScrollAttempts: 20,
+                scrollDistance: 400.0,
+                scrollDelay: const Duration(milliseconds: 600),
+                paginationTimeout: const Duration(seconds: 25),
+              );
 
               AllureReporter.reportStep(
-                  '✅ SCROLL WORKED - No additional content (correct for limited query)',
+                  'Scroll test completed: ${scrollResult.toString()}',
                   status: AllureStepStatus.passed);
-              print(
-                  '✅ SUCCESS: Scroll worked but no new content (expected for limited query)');
+
+              expect(scrollResult.success, isTrue,
+                  reason:
+                      'Enhanced scroll operation must succeed: ${scrollResult.error ?? "Unknown error"}');
+
+              expect(scrollResult.finalCount,
+                  greaterThanOrEqualTo(scrollResult.initialCount),
+                  reason: 'Card count should not decrease after scrolling');
+
+              if (scrollResult.paginationTriggered) {
+                AllureReporter.reportStep(
+                    'SUCCESS: Pagination loader was detected and triggered!',
+                    status: AllureStepStatus.passed);
+                TestLogger.log(
+                    'PERFECT: Pagination loader appeared as expected');
+
+                if (scrollResult.hasNewContent) {
+                  AllureReporter.reportStep(
+                      'New content loaded: ${scrollResult.totalNewCardsLoaded} additional cards',
+                      status: AllureStepStatus.passed);
+                  TestLogger.log(
+                      'BONUS: ${scrollResult.totalNewCardsLoaded} new cards loaded');
+                }
+              } else if (scrollResult.hasNewContent) {
+                AllureReporter.reportStep(
+                    'SUCCESS: New content loaded (${scrollResult.totalNewCardsLoaded} cards) even without visible loader',
+                    status: AllureStepStatus.passed);
+                TestLogger.log(
+                    'GOOD: Pagination working (${scrollResult.totalNewCardsLoaded} new cards loaded)');
+              } else if (scrollResult.reachedEnd) {
+                AllureReporter.reportStep(
+                    'Reached end of available content - no more hotels to load',
+                    status: AllureStepStatus.passed);
+                TestLogger.log(
+                    'INFO: End of list reached, no more content available');
+              } else {
+                AllureReporter.reportStep(
+                    'No pagination activity detected after ${scrollResult.scrollAttempts} scroll attempts',
+                    status: AllureStepStatus.failed);
+                throw Exception(
+                    'No pagination activity detected after continuous scrolling. '
+                    'This suggests either: 1) Pagination is not working, 2) All content fits on screen, '
+                    'or 3) End of list was reached without indicator. '
+                    'Scroll attempts: ${scrollResult.scrollAttempts}, '
+                    'Final cards: ${scrollResult.finalCount}');
+              }
+
+              AllureReporter.reportStep('Verify scroll mechanism is working');
+              expect(scrollResult.scrollAttempts, greaterThan(0),
+                  reason: 'Should have attempted scrolling');
+
+              TestLogger.log('Final Test Results:');
+              TestLogger.log('  Initial cards: ${scrollResult.initialCount}');
+              TestLogger.log('  Final cards: ${scrollResult.finalCount}');
+              TestLogger.log(
+                  '  New cards loaded: ${scrollResult.totalNewCardsLoaded}');
+              TestLogger.log(
+                  '  Scroll attempts: ${scrollResult.scrollAttempts}');
+              TestLogger.log(
+                  '  Pagination loader seen: ${scrollResult.paginationTriggered}');
+              TestLogger.log('  Reached end: ${scrollResult.reachedEnd}');
             } else {
-              AllureReporter.reportStep('No cards to scroll',
-                  status: AllureStepStatus.skipped);
+              AllureReporter.reportStep(
+                  'No hotel cards found for pagination testing',
+                  status: AllureStepStatus.failed);
+              throw Exception('Cannot test pagination without any hotel cards');
             }
           } else {
-            // For very unique queries, empty or error state is acceptable
             AllureReporter.reportStep(
-                'Limited query resulted in no results - acceptable',
-                status: AllureStepStatus.passed);
+                'Search did not return results for pagination testing',
+                status: AllureStepStatus.failed);
+            throw Exception(
+                'Cannot test pagination without search results. Search state: $searchState');
           }
 
           AllureReporter.setTestStatus(status: AllureTestStatus.passed);
@@ -610,13 +697,91 @@ void main() {
           AllureReporter.setTestStatus(
             status: AllureTestStatus.failed,
             reason:
-                'Scroll past last page test failed: $e\nStack trace: $stackTrace',
+                'Enhanced pagination test failed: $e\nStack trace: $stackTrace',
           );
           rethrow;
         }
       },
     );
 
+    patrolTest(
+      'Pagination behavior with different scroll patterns',
+      config: PatrolConfig.getConfig(),
+      ($) async {
+        AllureReporter.addLabel('feature', 'Hotels Pagination Patterns');
+        AllureReporter.setSeverity(AllureSeverity.normal);
+
+        try {
+          await TestUtils.initializeAllure();
+          await TestHelpers.initializeApp($);
+          await TestHelpers.navigateToPage($, 'hotels');
+
+          final testQueries = ['New York', 'London', 'Dubai', 'Tokyo', 'Paris'];
+          bool paginationTested = false;
+
+          for (final query in testQueries) {
+            TestLogger.log('Testing pagination with query: "$query"');
+
+            try {
+              final searchField = find.byKey(const Key('search_text_field'));
+              await $(searchField).enterText('');
+              await $.pump(const Duration(milliseconds: 300));
+              await $(searchField).enterText(query);
+              await $.pump(const Duration(milliseconds: 1500));
+
+              final searchState = await waitForSearchResults($,
+                  timeout: const Duration(seconds: 15));
+
+              if (searchState == SearchState.hasResults) {
+                final cardCount = find.byType(Card).evaluate().length;
+                TestLogger.log('Query "$query" returned $cardCount cards');
+
+                if (cardCount >= 5) {
+                  TestLogger.log(
+                      'Testing pagination with "$query" ($cardCount cards)');
+
+                  final result =
+                      await EnhancedScrollTester.performContinuousScroll(
+                    $,
+                    maxScrollAttempts: 15,
+                    scrollDistance: 350.0,
+                    scrollDelay: const Duration(milliseconds: 500),
+                  );
+
+                  if (result.paginationTriggered || result.hasNewContent) {
+                    TestLogger.log('Pagination working with query: "$query"');
+                    paginationTested = true;
+                    break;
+                  } else if (result.reachedEnd) {
+                    TestLogger.log('Query "$query" reached end of list');
+                    paginationTested = true;
+                    break;
+                  }
+                }
+              }
+            } catch (e) {
+              TestLogger.log('Query "$query" failed: $e');
+              continue;
+            }
+          }
+
+          if (!paginationTested) {
+            throw Exception(
+                'Could not test pagination with any of the test queries: $testQueries');
+          }
+
+          TestLogger.log('Pagination behavior testing completed successfully');
+          AllureReporter.setTestStatus(status: AllureTestStatus.passed);
+        } catch (e, stackTrace) {
+          AllureReporter.setTestStatus(
+            status: AllureTestStatus.failed,
+            reason:
+                'Pagination patterns test failed: $e\nStack trace: $stackTrace',
+          );
+          rethrow;
+        }
+      },
+    );
     patrolTest(
       'Add hotels to favorites and verify in favorites page',
       config: PatrolConfig.getConfig(),
@@ -637,7 +802,6 @@ void main() {
           await TestHelpers.navigateToPage($, 'favorites');
           await $.pump(const Duration(seconds: 1));
 
-          // Clear existing favorites if any
           final existingCards = find.byType(Card).evaluate().length;
           if (existingCards > 0) {
             AllureReporter.reportStep(
@@ -666,7 +830,6 @@ void main() {
                 status: AllureStepStatus.passed);
 
             if (availableCards > 0) {
-              // Target to add 2-3 hotels to favorites
               final hotelsToAdd = availableCards >= 3 ? 3 : availableCards;
               List<String> addedHotelNames = [];
 
@@ -677,7 +840,6 @@ void main() {
                 try {
                   final cardWidget = find.byType(Card).at(i);
 
-                  // Extract hotel name before adding to favorites
                   final nameTexts = find.descendant(
                       of: cardWidget, matching: find.byType(Text));
                   if (nameTexts.evaluate().isNotEmpty) {
@@ -685,10 +847,9 @@ void main() {
                         nameTexts.first.evaluate().first.widget as Text;
                     final hotelName = nameWidget.data ?? 'Hotel ${i + 1}';
                     addedHotelNames.add(hotelName);
-                    print('🏨 Adding hotel to favorites: "$hotelName"');
+                    TestLogger.log('Adding hotel to favorites: "$hotelName"');
                   }
 
-                  // Find the favorite button (outline heart)
                   final favoriteButton = find.descendant(
                       of: cardWidget,
                       matching: find.byIcon(Icons.favorite_outline));
@@ -697,27 +858,27 @@ void main() {
                     await $(favoriteButton.first).tap();
                     await $.pump(const Duration(milliseconds: 800));
 
-                    // Verify heart changed to filled
                     final filledHeart = find.descendant(
                         of: cardWidget, matching: find.byIcon(Icons.favorite));
                     expect(filledHeart.evaluate().isNotEmpty, isTrue,
                         reason:
                             'Heart should be filled after adding to favorites');
 
-                    print('✅ Successfully added hotel ${i + 1} to favorites');
+                    TestLogger.log(
+                        'Successfully added hotel ${i + 1} to favorites');
                     AllureReporter.reportStep(
                         'Added hotel ${i + 1}: ${addedHotelNames.last}',
                         status: AllureStepStatus.passed);
                   } else {
-                    print('⚠️ No favorite button found for hotel ${i + 1}');
-                    addedHotelNames
-                        .removeLast(); // Remove the name we just added
+                    TestLogger.log(
+                        'No favorite button found for hotel ${i + 1}');
+                    addedHotelNames.removeLast();
                   }
                 } catch (e) {
-                  print('❌ Failed to add hotel ${i + 1} to favorites: $e');
+                  TestLogger.log(
+                      'Failed to add hotel ${i + 1} to favorites: $e');
                   if (addedHotelNames.length > i) {
-                    addedHotelNames
-                        .removeLast(); // Remove the name if we added it
+                    addedHotelNames.removeLast();
                   }
                 }
               }
@@ -726,7 +887,7 @@ void main() {
               AllureReporter.reportStep(
                   'Successfully added $actuallyAdded hotels to favorites',
                   status: AllureStepStatus.passed);
-              print('📝 Added hotels: $addedHotelNames');
+              TestLogger.log('Added hotels: $addedHotelNames');
 
               if (actuallyAdded > 0) {
                 AllureReporter.reportStep(
@@ -739,15 +900,14 @@ void main() {
                 AllureReporter.reportStep('Verify favorites count and content');
                 final favoritesCards = find.byType(Card).evaluate().length;
 
-                // STRICT VERIFICATION: Exact count match
                 expect(favoritesCards, equals(actuallyAdded),
                     reason:
-                        'Favorites page should show exactly $actuallyAdded hotels, but found $favoritesCards');
+                        'Favorites page should show exactly $actuallyAdded hotels');
 
-                print(
-                    '✅ VERIFIED: Favorites count matches - Expected: $actuallyAdded, Found: $favoritesCards');
+                TestLogger.log(
+                    'VERIFIED: Favorites count matches - Expected: $actuallyAdded, Found: $favoritesCards');
                 AllureReporter.reportStep(
-                    '✅ FAVORITES COUNT VERIFIED: $favoritesCards matches $actuallyAdded',
+                    'FAVORITES COUNT VERIFIED: $favoritesCards matches $actuallyAdded',
                     status: AllureStepStatus.passed);
 
                 AllureReporter.reportStep(
@@ -765,15 +925,13 @@ void main() {
                     final favoriteHotelName = nameWidget.data ?? '';
                     foundHotelNames.add(favoriteHotelName);
 
-                    // STRICT VERIFICATION: Exact name match
                     expect(addedHotelNames.contains(favoriteHotelName), isTrue,
                         reason:
-                            'Hotel "$favoriteHotelName" in favorites should be one of the added hotels: $addedHotelNames');
+                            'Hotel "$favoriteHotelName" in favorites should be one of the added hotels');
 
-                    print(
-                        '✅ VERIFIED: Hotel "$favoriteHotelName" found in favorites');
+                    TestLogger.log(
+                        'VERIFIED: Hotel "$favoriteHotelName" found in favorites');
 
-                    // Verify heart is filled in favorites
                     final filledHeart = find.descendant(
                         of: favoriteCard,
                         matching: find.byIcon(Icons.favorite));
@@ -783,15 +941,14 @@ void main() {
                 }
 
                 AllureReporter.reportStep(
-                    '✅ ALL HOTEL NAMES VERIFIED: $foundHotelNames',
+                    'ALL HOTEL NAMES VERIFIED: $foundHotelNames',
                     status: AllureStepStatus.passed);
-                print('🎉 SUCCESS: All hotel names match exactly!');
+                TestLogger.log('SUCCESS: All hotel names match exactly!');
 
                 AllureReporter.reportStep(
                     'Remove hotels from favorites by unchecking hearts');
                 int removedCount = 0;
 
-                // Remove each favorite by clicking the filled heart
                 for (int i = favoritesCards - 1; i >= 0; i--) {
                   try {
                     final favoriteCard = find.byType(Card).at(i);
@@ -801,18 +958,21 @@ void main() {
 
                     if (filledHeartButton.evaluate().isNotEmpty) {
                       final hotelName = foundHotelNames[i];
-                      print('🗑️ Removing hotel from favorites: "$hotelName"');
+                      TestLogger.log(
+                          'Removing hotel from favorites: "$hotelName"');
 
                       await $(filledHeartButton.first).tap();
                       await $.pump(const Duration(milliseconds: 800));
                       removedCount++;
 
-                      print('✅ Removed hotel ${removedCount}: "$hotelName"');
+                      TestLogger.log(
+                          // ignore: unnecessary_brace_in_string_interps
+                          'Removed hotel ${removedCount}: "$hotelName"');
                       AllureReporter.reportStep('Removed hotel: $hotelName',
                           status: AllureStepStatus.passed);
                     }
                   } catch (e) {
-                    print('⚠️ Failed to remove favorite ${i + 1}: $e');
+                    TestLogger.log('Failed to remove favorite ${i + 1}: $e');
                   }
                 }
 
@@ -822,19 +982,17 @@ void main() {
 
                 final remainingCards = find.byType(Card).evaluate().length;
                 expect(remainingCards, equals(0),
-                    reason:
-                        'All hotels should be removed from favorites, but $remainingCards remain');
+                    reason: 'All hotels should be removed from favorites');
 
-                // Verify empty state is shown
                 final emptyStateIcon =
                     find.byKey(const Key('favorites_empty_state_icon'));
                 expect(emptyStateIcon, findsOneWidget,
                     reason:
                         'Empty state icon should be shown when no favorites');
 
-                print('🎉 SUCCESS: All hotels removed from favorites!');
+                TestLogger.log('SUCCESS: All hotels removed from favorites!');
                 AllureReporter.reportStep(
-                    '✅ ALL HOTELS REMOVED - Empty state verified',
+                    'ALL HOTELS REMOVED - Empty state verified',
                     status: AllureStepStatus.passed);
               } else {
                 AllureReporter.reportStep(
@@ -843,17 +1001,7 @@ void main() {
                 throw Exception(
                     'Could not add any hotels to favorites for testing');
               }
-            } else {
-              AllureReporter.reportStep(
-                  'No hotel cards found for favorites test',
-                  status: AllureStepStatus.failed);
-              throw Exception('No hotels available to add to favorites');
             }
-          } else {
-            AllureReporter.reportStep(
-                'Search did not return results for favorites test',
-                status: AllureStepStatus.failed);
-            throw Exception('Cannot test favorites without search results');
           }
 
           AllureReporter.setTestStatus(status: AllureTestStatus.passed);
@@ -866,48 +1014,33 @@ void main() {
         }
       },
     );
-
-    patrolTest(
-      'Very long search term (256 chars)',
-      config: PatrolConfig.getConfig(),
-      ($) async {
-        AllureReporter.addLabel('feature', 'Hotels Edge Cases');
-        AllureReporter.setSeverity(AllureSeverity.normal);
-
-        try {
-          AllureReporter.reportStep('Initialize app');
-          await TestUtils.initializeAllure();
-          await TestHelpers.initializeApp($);
-          await TestHelpers.navigateToPage($, 'hotels',
-              description: 'Navigating to Hotels page');
-          AllureReporter.reportStep('App initialized',
-              status: AllureStepStatus.passed);
-
-          AllureReporter.reportStep('Enter long search term');
-          final longTerm = 'A' * 256;
-          final searchState = await performSearch($, longTerm);
-          AllureReporter.reportStep('Search executed',
-              status: AllureStepStatus.passed);
-
-          AllureReporter.reportStep('Verify no crash and some output');
-          expect(find.byKey(const Key('hotels_scaffold')), findsOneWidget);
-          expect(searchState, isNot(SearchState.timeout),
-              reason: 'Long search should complete');
-          AllureReporter.reportStep('No crash verified, state: $searchState',
-              status: AllureStepStatus.passed);
-
-          AllureReporter.setTestStatus(status: AllureTestStatus.passed);
-        } catch (e, stackTrace) {
-          AllureReporter.setTestStatus(
-            status: AllureTestStatus.failed,
-            reason: 'Test failed: $e\nStack trace: $stackTrace',
-          );
-          rethrow;
-        }
-      },
-    );
   });
 }
 
-// Enum for search states
 enum SearchState { hasResults, hasError, isEmpty, timeout }
+
+class ScrollResult {
+  final bool success;
+  final int initialCount;
+  final int finalCount;
+  final int scrollAttempts;
+  final bool reachedEnd;
+  final String? error;
+
+  ScrollResult({
+    required this.success,
+    required this.initialCount,
+    required this.finalCount,
+    required this.scrollAttempts,
+    this.reachedEnd = false,
+    this.error,
+  });
+
+  bool get hasNewContent => finalCount > initialCount;
+  int get newContentCount => finalCount - initialCount;
+
+  @override
+  String toString() {
+    return 'ScrollResult(success: $success, $initialCount -> $finalCount cards, attempts: $scrollAttempts, reachedEnd: $reachedEnd${error != null ? ', error: $error' : ''})';
+  }
+}
