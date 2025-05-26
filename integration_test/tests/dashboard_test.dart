@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:patrol/patrol.dart';
-import '../utils/test_helpers.dart';
+import '../helpers/test_helpers.dart';
 import '../utils/test_utils.dart';
-import '../utils/patrol_config.dart';
+import '../config/patrol_config.dart';
 import '../reports/allure_reporter.dart';
 import '../helpers/allure_helper.dart';
 import '../locators/app_locators.dart';
