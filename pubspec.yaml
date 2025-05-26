@@ -55,4 +55,4 @@ patrol:
   android:
     package_name: com.example.hotel_booking
   ios:
-    bundle_id: com.example.hotelBooking
+    bundle_id: com.ahmadwaqar.hotelBooking
