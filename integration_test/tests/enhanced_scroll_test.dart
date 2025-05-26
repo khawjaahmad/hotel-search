@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:patrol/patrol.dart';
+import '../logger/test_logger.dart';
+import '../locators/app_locators.dart';
 
 class EnhancedScrollTester {
-  
   static Future<PaginationScrollResult> performContinuousScroll(
     PatrolIntegrationTester $, {
     int maxScrollAttempts = 15,
@@ -12,10 +13,10 @@ class EnhancedScrollTester {
     Duration paginationTimeout = const Duration(seconds: 20),
   }) async {
     TestLogger.log('Starting enhanced continuous scroll test');
-    
+
     final initialCardCount = find.byType(Card).evaluate().length;
     TestLogger.log('Initial card count: $initialCardCount');
-    
+
     if (initialCardCount == 0) {
       return PaginationScrollResult.failed('No cards found to scroll');
     }
@@ -29,44 +30,45 @@ class EnhancedScrollTester {
     int cardCountBeforeScroll = initialCardCount;
     bool paginationTriggered = false;
     int totalNewCards = 0;
-    
+
     TestLogger.log('Starting continuous scroll simulation');
-    
+
     while (scrollAttempts < maxScrollAttempts && !paginationTriggered) {
       scrollAttempts++;
       TestLogger.log('Scroll attempt $scrollAttempts/$maxScrollAttempts');
-      
+
       await _performGradualScroll($, scrollableWidget, scrollDistance);
       await $.pump(scrollDelay);
-      
-      final paginationLoader = find.byKey(const Key('hotels_pagination_loading'));
-      if (paginationLoader.evaluate().isNotEmpty) {
+
+      final paginationLoader = AppLocators.getHotelsPaginationLoading($);
+      if (AppLocators.elementExists($, paginationLoader)) {
         TestLogger.log('Pagination loader appeared');
         paginationTriggered = true;
-        
+
         await _waitForPaginationToComplete($, paginationTimeout);
         break;
       }
-      
+
       final currentCardCount = find.byType(Card).evaluate().length;
       if (currentCardCount > cardCountBeforeScroll) {
         final newCards = currentCardCount - cardCountBeforeScroll;
         totalNewCards += newCards;
         cardCountBeforeScroll = currentCardCount;
-        TestLogger.log('New cards loaded: +$newCards (total: $currentCardCount)');
+        TestLogger.log(
+            'New cards loaded: +$newCards (total: $currentCardCount)');
         continue;
       }
-      
+
       if (await _isScrolledToBottom($, scrollableWidget)) {
         TestLogger.log('Reached bottom of the list');
         break;
       }
-      
+
       TestLogger.log('No new content yet, continuing scroll');
     }
-    
+
     final finalCardCount = find.byType(Card).evaluate().length;
-    
+
     return PaginationScrollResult(
       success: true,
       initialCount: initialCardCount,
@@ -74,29 +76,31 @@ class EnhancedScrollTester {
       scrollAttempts: scrollAttempts,
       paginationTriggered: paginationTriggered,
       totalNewCardsLoaded: totalNewCards,
-      reachedEnd: !paginationTriggered && finalCardCount == cardCountBeforeScroll,
+      reachedEnd:
+          !paginationTriggered && finalCardCount == cardCountBeforeScroll,
     );
   }
 
-  static Future<Finder?> _findScrollableWidget(PatrolIntegrationTester $) async {
-    final hotelsScrollView = find.byKey(const Key('hotels_scroll_view'));
-    if (hotelsScrollView.evaluate().isNotEmpty) {
+  static Future<Finder?> _findScrollableWidget(
+      PatrolIntegrationTester $) async {
+    final hotelsScrollView = AppLocators.getHotelsScrollView($);
+    if (AppLocators.elementExists($, hotelsScrollView)) {
       TestLogger.log('Found hotels_scroll_view');
-      return hotelsScrollView;
+      return hotelsScrollView.finder;
     }
-    
+
     final customScrollView = find.byType(CustomScrollView);
     if (customScrollView.evaluate().isNotEmpty) {
       TestLogger.log('Found CustomScrollView');
       return customScrollView.first;
     }
-    
+
     final scrollable = find.byType(Scrollable);
     if (scrollable.evaluate().isNotEmpty) {
       TestLogger.log('Found Scrollable widget');
       return scrollable.first;
     }
-    
+
     TestLogger.log('No scrollable widget found');
     return null;
   }
@@ -108,7 +112,7 @@ class EnhancedScrollTester {
   ) async {
     const int steps = 3;
     final stepDistance = distance / steps;
-    
+
     for (int i = 0; i < steps; i++) {
       await $.tester.drag(scrollableWidget, Offset(0, -stepDistance));
       await $.pump(const Duration(milliseconds: 50));
@@ -120,21 +124,22 @@ class EnhancedScrollTester {
     Duration timeout,
   ) async {
     TestLogger.log('Waiting for pagination to complete');
-    
+
     final stopwatch = Stopwatch()..start();
-    final paginationLoader = find.byKey(const Key('hotels_pagination_loading'));
-    
-    while (stopwatch.elapsed < timeout && paginationLoader.evaluate().isNotEmpty) {
+    final paginationLoader = AppLocators.getHotelsPaginationLoading($);
+
+    while (stopwatch.elapsed < timeout &&
+        AppLocators.elementExists($, paginationLoader)) {
       await $.pump(const Duration(milliseconds: 500));
       TestLogger.log('Still loading... ${stopwatch.elapsed.inSeconds}s');
     }
-    
-    if (paginationLoader.evaluate().isNotEmpty) {
+
+    if (AppLocators.elementExists($, paginationLoader)) {
       TestLogger.log('Pagination loader still visible after timeout');
     } else {
       TestLogger.log('Pagination completed in ${stopwatch.elapsed.inSeconds}s');
     }
-    
+
     await $.pump(const Duration(seconds: 1));
   }
 
@@ -144,12 +149,12 @@ class EnhancedScrollTester {
   ) async {
     try {
       final cardCountBefore = find.byType(Card).evaluate().length;
-      
+
       await $.tester.drag(scrollableWidget, const Offset(0, -100));
       await $.pump(const Duration(milliseconds: 300));
-      
+
       final cardCountAfter = find.byType(Card).evaluate().length;
-      
+
       return cardCountBefore == cardCountAfter;
     } catch (e) {
       TestLogger.log('Error checking scroll bottom: $e');
@@ -162,24 +167,24 @@ class EnhancedScrollTester {
     String testName,
   ) async {
     TestLogger.log('Starting realistic pagination test: $testName');
-    
+
     try {
       await _performSearchForPagination($, 'London');
       await $.pump(const Duration(seconds: 2));
-      
+
       final initialCards = find.byType(Card).evaluate().length;
       if (initialCards == 0) {
         throw Exception('No search results to test pagination');
       }
-      
-      TestLogger.log('Ready to test pagination with $initialCards initial cards');
-      
+
+      TestLogger.log(
+          'Ready to test pagination with $initialCards initial cards');
+
       final result = await performContinuousScroll($);
-      
+
       _validatePaginationResult(result, testName);
-      
+
       TestLogger.log('Pagination test completed successfully: $testName');
-      
     } catch (e, stackTrace) {
       TestLogger.log('Pagination test failed: $testName - $e');
       TestLogger.log('Stack trace: $stackTrace');
@@ -192,25 +197,27 @@ class EnhancedScrollTester {
     String query,
   ) async {
     TestLogger.log('Performing search for pagination test: "$query"');
-    
-    final searchField = find.byKey(const Key('search_text_field'));
-    if (searchField.evaluate().isEmpty) {
+
+    final searchField = AppLocators.getSearchTextField($);
+    if (!AppLocators.elementExists($, searchField)) {
       throw Exception('Search field not found');
     }
-    
-    await $(searchField).enterText('');
+
+    await AppLocators.smartEnterText($, searchField, '');
     await $.pump(const Duration(milliseconds: 300));
-    await $(searchField).enterText(query);
+    await AppLocators.smartEnterText($, searchField, query, clearFirst: false);
     await $.pump(const Duration(milliseconds: 1000));
-    
+
     final stopwatch = Stopwatch()..start();
     while (stopwatch.elapsed < const Duration(seconds: 15)) {
       await $.pump(const Duration(milliseconds: 500));
-      
+
       final hasCards = find.byType(Card).evaluate().isNotEmpty;
-      final hasError = find.byKey(const Key('hotels_error_message')).evaluate().isNotEmpty;
-      final isLoading = find.byType(CircularProgressIndicator).evaluate().isNotEmpty;
-      
+      final hasError =
+          AppLocators.elementExists($, AppLocators.getHotelsErrorMessage($));
+      final isLoading =
+          find.byType(CircularProgressIndicator).evaluate().isNotEmpty;
+
       if (hasCards) {
         TestLogger.log('Search results loaded');
         return;
@@ -220,27 +227,30 @@ class EnhancedScrollTester {
         await $.pump(const Duration(milliseconds: 500));
       }
     }
-    
+
     throw Exception('Search timed out or no results');
   }
 
-  static void _validatePaginationResult(PaginationScrollResult result, String testName) {
+  static void _validatePaginationResult(
+      PaginationScrollResult result, String testName) {
     TestLogger.log('Validating pagination result for: $testName');
     TestLogger.log('Result: ${result.toString()}');
-    
+
     if (!result.success) {
       throw Exception('Pagination test failed: ${result.error}');
     }
-    
+
     expect(result.success, isTrue, reason: 'Scroll operation should succeed');
-    expect(result.scrollAttempts, greaterThan(0), reason: 'Should have attempted scrolling');
+    expect(result.scrollAttempts, greaterThan(0),
+        reason: 'Should have attempted scrolling');
     expect(result.finalCount, greaterThanOrEqualTo(result.initialCount),
         reason: 'Final card count should not decrease');
-    
+
     if (result.paginationTriggered) {
       TestLogger.log('Pagination loader was triggered - test passed');
     } else if (result.totalNewCardsLoaded > 0) {
-      TestLogger.log('New cards loaded without visible loader - pagination working');
+      TestLogger.log(
+          'New cards loaded without visible loader - pagination working');
     } else if (result.reachedEnd) {
       TestLogger.log('Reached end of list - no more content available');
     } else {
@@ -281,7 +291,7 @@ class PaginationScrollResult {
         error = errorMessage;
 
   bool get hasNewContent => totalNewCardsLoaded > 0;
-  
+
   @override
   String toString() {
     return 'PaginationScrollResult('
@@ -293,11 +303,5 @@ class PaginationScrollResult {
         'reachedEnd: $reachedEnd'
         '${error != null ? ', error: $error' : ''}'
         ')';
-  }
-}
-
-class TestLogger {
-  static void log(String message) {
-    debugPrint('[TEST] ${DateTime.now().toIso8601String()}: $message');
   }
 }

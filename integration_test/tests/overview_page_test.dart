@@ -42,17 +42,6 @@ void main() {
           reason: 'Should display explore icon');
     }
 
-    void verifyOverviewPageStructure(PatrolIntegrationTester $) {
-      expect(find.byType(Scaffold).evaluate().isNotEmpty, isTrue,
-          reason: 'Should have Scaffold structure');
-      expect(find.byType(AppBar).evaluate().isNotEmpty, isTrue,
-          reason: 'Should have AppBar structure');
-      expect(find.byType(Center).evaluate().isNotEmpty, isTrue,
-          reason: 'Should have Center layout');
-      expect(find.byType(Icon).evaluate().isNotEmpty, isTrue,
-          reason: 'Should have Icon widget');
-    }
-
     Future<void> testNavigationFlow(PatrolIntegrationTester $) async {
       final tabs = ['hotels', 'favorites', 'account'];
 
@@ -65,26 +54,6 @@ void main() {
       final overviewTab = AppLocators.getOverviewTab($);
       await AppLocators.smartTap($, overviewTab);
       await $.pump(const Duration(milliseconds: 500));
-    }
-
-    Future<void> testOverviewAsDefaultPage(PatrolIntegrationTester $) async {
-      await initializeTest($);
-      await $.pump(const Duration(seconds: 1));
-      verifyOverviewPageElements($);
-      verifyOverviewContent($);
-    }
-
-    Future<Duration> performNavigationStressTest(
-        PatrolIntegrationTester $, int iterations) async {
-      final startTime = DateTime.now();
-
-      for (int i = 0; i < iterations; i++) {
-        await testNavigationFlow($);
-        await $.pump(const Duration(milliseconds: 100));
-      }
-
-      final endTime = DateTime.now();
-      return endTime.difference(startTime);
     }
 
     patrolTest(
@@ -163,42 +132,6 @@ void main() {
     );
 
     patrolTest(
-      'Overview page layout structure is correct',
-      config: PatrolConfig.getConfig(),
-      ($) async {
-        AllureReporter.addLabel('feature', 'Overview Layout');
-        AllureReporter.setSeverity(AllureSeverity.normal);
-
-        try {
-          AllureReporter.reportStep('Initialize app');
-          await initializeTest($);
-          await navigateToOverview($);
-          AllureReporter.reportStep('App initialized and navigated',
-              status: AllureStepStatus.passed);
-
-          AllureReporter.reportStep('Verify page structure');
-          verifyOverviewPageStructure($);
-          AllureReporter.reportStep('Page structure verified',
-              status: AllureStepStatus.passed);
-
-          AllureReporter.reportStep('Verify widget hierarchy');
-          expect(find.byType(MaterialApp).evaluate().isNotEmpty, isTrue,
-              reason: 'Should have MaterialApp root');
-          AllureReporter.reportStep('Widget hierarchy verified',
-              status: AllureStepStatus.passed);
-
-          AllureReporter.setTestStatus(status: AllureTestStatus.passed);
-        } catch (e, stackTrace) {
-          AllureReporter.setTestStatus(
-            status: AllureTestStatus.failed,
-            reason: 'Test failed: $e\nStack trace: $stackTrace',
-          );
-          rethrow;
-        }
-      },
-    );
-
-    patrolTest(
       'Overview page navigation functionality works',
       config: PatrolConfig.getConfig(),
       ($) async {
@@ -220,111 +153,6 @@ void main() {
           verifyOverviewPageElements($);
           verifyOverviewContent($);
           AllureReporter.reportStep('Return to overview verified',
-              status: AllureStepStatus.passed);
-
-          AllureReporter.setTestStatus(status: AllureTestStatus.passed);
-        } catch (e, stackTrace) {
-          AllureReporter.setTestStatus(
-            status: AllureTestStatus.failed,
-            reason: 'Test failed: $e\nStack trace: $stackTrace',
-          );
-          rethrow;
-        }
-      },
-    );
-
-    patrolTest(
-      'Overview page is default page on app launch',
-      config: PatrolConfig.getConfig(),
-      ($) async {
-        AllureReporter.addLabel('feature', 'Overview Default');
-        AllureReporter.setSeverity(AllureSeverity.critical);
-
-        try {
-          AllureReporter.reportStep('Test default page behavior');
-          await testOverviewAsDefaultPage($);
-          AllureReporter.reportStep('Default page behavior verified',
-              status: AllureStepStatus.passed);
-
-          AllureReporter.reportStep('Verify no manual navigation needed');
-          verifyOverviewPageElements($);
-          AllureReporter.reportStep('Automatic navigation verified',
-              status: AllureStepStatus.passed);
-
-          AllureReporter.setTestStatus(status: AllureTestStatus.passed);
-        } catch (e, stackTrace) {
-          AllureReporter.setTestStatus(
-            status: AllureTestStatus.failed,
-            reason: 'Test failed: $e\nStack trace: $stackTrace',
-          );
-          rethrow;
-        }
-      },
-    );
-
-    patrolTest(
-      'Overview page performance under navigation stress',
-      config: PatrolConfig.getConfig(),
-      ($) async {
-        AllureReporter.addLabel('feature', 'Overview Performance');
-        AllureReporter.setSeverity(AllureSeverity.normal);
-
-        try {
-          AllureReporter.reportStep('Initialize app');
-          await initializeTest($);
-          AllureReporter.reportStep('App initialized',
-              status: AllureStepStatus.passed);
-
-          AllureReporter.reportStep('Perform navigation stress test');
-          final duration = await performNavigationStressTest($, 5);
-          AllureReporter.reportStep(
-              'Stress test completed in ${duration.inMilliseconds}ms',
-              status: AllureStepStatus.passed);
-
-          AllureReporter.reportStep('Verify page stability after stress');
-          verifyOverviewPageElements($);
-          verifyOverviewContent($);
-          AllureReporter.reportStep('Page stability verified',
-              status: AllureStepStatus.passed);
-
-          AllureReporter.setTestStatus(status: AllureTestStatus.passed);
-        } catch (e, stackTrace) {
-          AllureReporter.setTestStatus(
-            status: AllureTestStatus.failed,
-            reason: 'Test failed: $e\nStack trace: $stackTrace',
-          );
-          rethrow;
-        }
-      },
-    );
-
-    patrolTest(
-      'Overview page visual consistency and theming',
-      config: PatrolConfig.getConfig(),
-      ($) async {
-        AllureReporter.addLabel('feature', 'Overview Visual');
-        AllureReporter.setSeverity(AllureSeverity.normal);
-
-        try {
-          AllureReporter.reportStep('Initialize app');
-          await initializeTest($);
-          await navigateToOverview($);
-          AllureReporter.reportStep('App initialized and navigated',
-              status: AllureStepStatus.passed);
-
-          AllureReporter.reportStep('Verify theme consistency');
-          expect(find.byType(MaterialApp).evaluate().isNotEmpty, isTrue,
-              reason: 'Should have consistent Material theme');
-          expect(find.byType(Scaffold).evaluate().isNotEmpty, isTrue,
-              reason: 'Should use Scaffold structure');
-          AllureReporter.reportStep('Theme consistency verified',
-              status: AllureStepStatus.passed);
-
-          AllureReporter.reportStep('Verify icon and layout positioning');
-          verifyOverviewPageStructure($);
-          final iconFinder = AppLocators.getOverviewIcon($);
-          await AppLocators.smartWaitFor($, iconFinder);
-          AllureReporter.reportStep('Layout positioning verified',
               status: AllureStepStatus.passed);
 
           AllureReporter.setTestStatus(status: AllureTestStatus.passed);

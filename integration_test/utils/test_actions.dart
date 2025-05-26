@@ -6,7 +6,7 @@ import '../locators/app_locators.dart';
 
 enum SearchState { hasResults, hasError, isEmpty, timeout }
 
-class TestActionsUtils {
+class TestActions {
   static Future<SearchState> waitForSearchResults(
     PatrolIntegrationTester $, {
     Duration timeout = const Duration(seconds: 15),

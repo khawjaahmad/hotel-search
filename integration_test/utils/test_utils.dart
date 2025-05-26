@@ -8,6 +8,6 @@ class TestUtils {
   }
 
   static Duration getDefaultTimeout() {
-    return const Duration(seconds: 30); // Matches dart_test.yaml
+    return const Duration(seconds: 30);
   }
 }
