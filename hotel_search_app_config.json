@@ -1,0 +1,11 @@
+{
+  "name": "hotel-search",
+  "version": "1.0.0",
+  "description": "Hotel Search App Testing",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "uuid": "^9.0.1"
+  }
+}
