@@ -141,21 +141,11 @@ app.*.map.json
 
 # Node.js related
 node_modules/
-package-lock.json
-package.json
 
 # Other project-specific files
 Makefile
 README.md
 testing-strategy.md
-# Test artifacts
-allure-results/
-allure-report/
-test-results/
-coverage/
-node_modules/
-*.log
 
 # Temporary files
-.DS_Store
 Thumbs.db

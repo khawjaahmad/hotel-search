@@ -1,7 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
-import '../reports/allure_reporter.dart';
+
 import '../logger/test_logger.dart';
+import '../reports/allure_reporter.dart';
 
 /// Enhanced Allure Helper that integrates with your existing AllureReporter
 /// Provides comprehensive test reporting with automatic result generation
@@ -272,7 +273,9 @@ App.Name=Hotel Booking App
     if (testName.toLowerCase().contains('hotel')) return 'Hotels';
     if (testName.toLowerCase().contains('favorite')) return 'Favorites';
     if (testName.toLowerCase().contains('navigation') ||
-        testName.toLowerCase().contains('dashboard')) return 'Navigation';
+        testName.toLowerCase().contains('dashboard')) {
+      return 'Navigation';
+    }
     if (testName.toLowerCase().contains('overview')) return 'Overview';
     if (testName.toLowerCase().contains('account')) return 'Account';
     return 'General';

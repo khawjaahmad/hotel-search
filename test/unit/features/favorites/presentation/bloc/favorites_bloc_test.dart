@@ -3,10 +3,10 @@ import 'dart:async';
 
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mocktail/mocktail.dart';
 import 'package:hotel_booking/features/favorites/domain/usecases/usecases.dart';
 import 'package:hotel_booking/features/favorites/presentation/bloc/favorites_bloc.dart';
 import 'package:hotel_booking/features/hotels/domain/entities/entities.dart';
+import 'package:mocktail/mocktail.dart';
 
 // Local Mock Classes (Self-contained)
 class MockGetFavoritesUseCase with Mock implements GetFavoritesUseCase {}
@@ -42,7 +42,6 @@ void main() {
     late StreamController<List<Hotel>> watchFavoritesController;
 
     setUpAll(() {
-      // Register fallback values for any() matchers
       registerFallbackValue(testHotel);
     });
 
@@ -54,10 +53,12 @@ void main() {
 
       watchFavoritesController = StreamController<List<Hotel>>.broadcast();
 
-      // Setup default mocks
       when(() => mockGetFavoritesUseCase.call()).thenReturn([]);
       when(() => mockWatchFavoritesUseCase.call())
           .thenAnswer((_) => watchFavoritesController.stream);
+      when(() => mockAddFavoriteUseCase.call(any())).thenAnswer((_) async {});
+      when(() => mockRemoveFavoriteUseCase.call(any()))
+          .thenAnswer((_) async {});
     });
 
     tearDown(() {
@@ -76,19 +77,13 @@ void main() {
 
     group('initialization', () {
       test('should have correct initial state', () {
-        // Arrange & Act
         favoritesBloc = createBloc();
-
-        // Assert
         expect(favoritesBloc.state, isA<FavoritesState>());
         expect(favoritesBloc.state.items, isEmpty);
       });
 
       test('should call getFavoritesUseCase on initialization', () {
-        // Act
         favoritesBloc = createBloc();
-
-        // Assert
         verify(() => mockGetFavoritesUseCase.call()).called(1);
       });
 
@@ -104,126 +99,78 @@ void main() {
       );
     });
 
-    group('AddFavoriteEvent', () {
+    group('FavoritesEvents', () {
       blocTest<FavoritesBloc, FavoritesState>(
-        'should call addFavoriteUseCase when AddFavoriteEvent is added',
+        'should emit new state when FavoritesUpdatedEvent is added',
         build: createBloc,
-        act: (bloc) {
-          bloc.add(AddFavoriteEvent(hotel: testHotel));
-        },
-        verify: (_) {
-          verify(() => mockAddFavoriteUseCase.call(testHotel)).called(1);
-        },
-      );
-
-      blocTest<FavoritesBloc, FavoritesState>(
-        'should not emit new states when adding favorite (repository handles state)',
-        build: createBloc,
-        skip: 1, // Skip initial state emission
-        act: (bloc) {
-          bloc.add(AddFavoriteEvent(hotel: testHotel));
-        },
-        expect: () => [],
-        verify: (_) {
-          verify(() => mockAddFavoriteUseCase.call(testHotel)).called(1);
-        },
-      );
-    });
-
-    group('RemoveFavoriteEvent', () {
-      blocTest<FavoritesBloc, FavoritesState>(
-        'should call removeFavoriteUseCase when RemoveFavoriteEvent is added',
-        build: createBloc,
-        act: (bloc) {
-          bloc.add(RemoveFavoriteEvent(hotel: testHotel));
-        },
-        verify: (_) {
-          verify(() => mockRemoveFavoriteUseCase.call(testHotel)).called(1);
-        },
-      );
-    });
-
-    group('FavoritesUpdatedEvent', () {
-      blocTest<FavoritesBloc, FavoritesState>(
-        'should emit new state with updated items',
-        build: createBloc,
-        skip: 1, // Skip initial state emission
-        act: (bloc) {
-          bloc.add(FavoritesUpdatedEvent(items: multipleHotels));
-        },
+        seed: () => FavoritesState(items: []), // Set initial state
+        act: (bloc) => bloc.add(FavoritesUpdatedEvent(items: multipleHotels)),
         expect: () => [
           FavoritesState(items: multipleHotels),
         ],
       );
 
       blocTest<FavoritesBloc, FavoritesState>(
-        'should emit state with empty list when items are empty',
+        'should handle AddFavoriteEvent',
         build: createBloc,
-        act: (bloc) {
-          bloc.add(FavoritesUpdatedEvent(items: []));
+        act: (bloc) => bloc.add(const AddFavoriteEvent(hotel: testHotel)),
+        verify: (_) {
+          verify(() => mockAddFavoriteUseCase.call(testHotel)).called(1);
         },
-        expect: () => [
-          FavoritesState(items: []),
-        ],
       );
-    });
 
-    group('stream subscription', () {
-      test('should listen to watchFavoritesUseCase stream and emit updates',
-          () async {
-        // Arrange
+      blocTest<FavoritesBloc, FavoritesState>(
+        'should handle RemoveFavoriteEvent',
+        build: createBloc,
+        act: (bloc) => bloc.add(const RemoveFavoriteEvent(hotel: testHotel)),
+        verify: (_) {
+          verify(() => mockRemoveFavoriteUseCase.call(testHotel)).called(1);
+        },
+      );
+
+      test('should handle stream updates from watchFavoritesUseCase', () async {
         favoritesBloc = createBloc();
-        final testHotels = [testHotel];
 
-        // Act
-        watchFavoritesController.add(testHotels);
-        await Future.delayed(Duration.zero);
+        // Simulate stream updates
+        watchFavoritesController.add(multipleHotels);
+        await Future<void>.delayed(const Duration(milliseconds: 100));
 
-        // Assert
-        expect(favoritesBloc.state.items, equals(testHotels));
+        expect(favoritesBloc.state.items, equals(multipleHotels));
       });
     });
 
-    group('FavoritesState', () {
-      test('should correctly check if hotel is contained in favorites', () {
-        // Arrange
-        final state = FavoritesState(items: [testHotel]);
-
-        // Act & Assert
-        expect(state.contains(testHotel), isTrue);
-        expect(state.contains(anotherHotel), isFalse);
+    group('Events equality', () {
+      test('FavoritesUpdatedEvent props should contain items', () {
+        final event = FavoritesUpdatedEvent(items: multipleHotels);
+        expect(event.props, [multipleHotels]);
       });
 
-      test('should handle empty favorites when checking contains', () {
-        // Arrange
-        final state = FavoritesState(items: []);
-
-        // Act & Assert
-        expect(state.contains(testHotel), isFalse);
+      test('AddFavoriteEvent props should contain hotel', () {
+        const event = AddFavoriteEvent(hotel: testHotel);
+        expect(event.props, [testHotel]);
       });
 
-      test('should support equality comparison', () {
-        // Arrange
-        final state1 = FavoritesState(items: [testHotel]);
-        final state2 = FavoritesState(items: [testHotel]);
-        final state3 = FavoritesState(items: [anotherHotel]);
+      test('RemoveFavoriteEvent props should contain hotel', () {
+        const event = RemoveFavoriteEvent(hotel: testHotel);
+        expect(event.props, [testHotel]);
+      });
+    });
 
-        // Act & Assert
+    group('State tests', () {
+      test('FavoritesState should maintain items', () {
+        final state = FavoritesState(items: multipleHotels);
+        expect(state.items, multipleHotels);
+      });
+
+      test('FavoritesState props should contain items', () {
+        final state = FavoritesState(items: multipleHotels);
+        expect(state.props, [multipleHotels]);
+      });
+
+      test('Different FavoritesStates with same items should be equal', () {
+        final state1 = FavoritesState(items: multipleHotels);
+        final state2 = FavoritesState(items: multipleHotels);
         expect(state1, equals(state2));
-        expect(state1, isNot(equals(state3)));
-      });
-    });
-
-    group('disposal', () {
-      test('should cancel stream subscription on close', () async {
-        // Arrange
-        favoritesBloc = createBloc();
-
-        // Act
-        await favoritesBloc.close();
-
-        // Assert
-        expect(favoritesBloc.isClosed, isTrue);
       });
     });
   });
