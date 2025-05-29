@@ -2,8 +2,8 @@ import 'package:patrol/patrol.dart';
 
 import '../config/patrol_config.dart';
 import '../helpers/test_helpers.dart';
+import '../helpers/test_logger.dart';
 import '../screens/account_screen_actions.dart';
-import '../strings/test_strings.dart';
 
 void main() {
   patrolSetUp(() async {
@@ -15,47 +15,53 @@ void main() {
   });
 
   patrolTest(
-    AccountTestStrings.loadTest,
+    'Account page loads with correct structure',
     config: PatrolConfig.getConfig(),
     ($) async {
-      $.log(AccountTestStrings.initializingTest);
+      TestLogger.logTestStart($, 'Account Structure Test');
       await TestHelpers.initializeApp($);
-      $.log('Navigating to account page');
-      await TestHelpers.navigateToPage($, AccountTestStrings.accountTabName);
+
+      TestLogger.logNavigation($, 'account page');
+      await TestHelpers.navigateToPage($, 'account');
+
       await AccountScreenActions.verifyAccountPageStructure($);
+      TestLogger.logTestSuccess($, 'Account page structure verified');
     },
   );
 
   patrolTest(
-    AccountTestStrings.navigationTest,
+    'Account page persists after navigation',
     config: PatrolConfig.getConfig(),
     ($) async {
-      $.log(AccountTestStrings.initializingTest);
+      TestLogger.logTestStart($, 'Account Navigation Persistence Test');
       await TestHelpers.initializeApp($);
-      $.log('Navigating to account page');
-      await TestHelpers.navigateToPage($, AccountTestStrings.accountTabName);
+
+      TestLogger.logNavigation($, 'account page');
+      await TestHelpers.navigateToPage($, 'account');
       await AccountScreenActions.verifyAccountPageStructure($);
 
-      $.log(AccountTestStrings.navigationAway);
+      TestLogger.logTestStep($, 'Navigating away from account page');
       await TestHelpers.navigateToPage($, 'hotels');
 
-      $.log(AccountTestStrings.navigationBack);
-      await TestHelpers.navigateToPage($, AccountTestStrings.accountTabName);
+      TestLogger.logTestStep($, 'Navigating back to account page');
+      await TestHelpers.navigateToPage($, 'account');
 
       await AccountScreenActions.verifyAccountPageStructure($);
+      TestLogger.logTestSuccess($, 'Account navigation persistence verified');
     },
   );
 
   patrolTest(
-    AccountTestStrings.themeTest,
+    'Account page theme matches system theme',
     config: PatrolConfig.getConfig(),
     ($) async {
-      $.log(AccountTestStrings.initializingTest);
-
+      TestLogger.logTestStart($, 'Account Theme Test');
       await TestHelpers.initializeApp($);
 
-      $.log('Navigating to account page');
-      await TestHelpers.navigateToPage($, AccountTestStrings.accountTabName);
+      TestLogger.logNavigation($, 'account page');
+      await TestHelpers.navigateToPage($, 'account');
+
+      TestLogger.logTestSuccess($, 'Account theme test completed');
     },
   );
 }

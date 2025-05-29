@@ -2,8 +2,8 @@ import 'package:patrol/patrol.dart';
 
 import '../config/patrol_config.dart';
 import '../helpers/test_helpers.dart';
+import '../helpers/test_logger.dart';
 import '../screens/dashboard_screen_actions.dart';
-import '../strings/test_strings.dart';
 
 void main() {
   patrolSetUp(() async {
@@ -15,38 +15,37 @@ void main() {
   });
 
   patrolTest(
-    DashboardTestStrings.loadTest,
+    'Dashboard Load Test',
     config: PatrolConfig.getConfig(),
     ($) async {
-      $.log(DashboardTestStrings.initializingTest);
+      TestLogger.logTestStart($, 'Dashboard Load Test');
       await TestHelpers.initializeApp($);
 
-      $.log(DashboardTestStrings.verifyingStructure);
+      TestLogger.logValidation($, 'dashboard structure');
       await DashboardScreenActions.verifyDashboardStructure($);
+
+      TestLogger.logTestSuccess($, 'Dashboard loaded successfully');
     },
   );
 
   patrolTest(
-    DashboardTestStrings.navigationTest,
+    'Dashboard Navigation Test',
     config: PatrolConfig.getConfig(),
     ($) async {
-      $.log(DashboardTestStrings.initializingTest);
+      TestLogger.logTestStart($, 'Dashboard Navigation Test');
       await TestHelpers.initializeApp($);
 
-      // First verify structure
-      $.log(DashboardTestStrings.verifyingStructure);
+      TestLogger.logValidation($, 'dashboard structure');
       await DashboardScreenActions.verifyDashboardStructure($);
 
-      // Then test navigation
-      $.log(DashboardTestStrings.navigationStarted);
+      TestLogger.logTestStep($, 'Testing navigation between tabs');
       await TestHelpers.navigateToPage($, 'hotels');
       await TestHelpers.navigateToPage($, 'favorites');
       await TestHelpers.navigateToPage($, 'account');
-      await TestHelpers.navigateToPage(
-          $, DashboardTestStrings.dashboardTabName);
+      await TestHelpers.navigateToPage($, 'overview');
 
-      // Verify structure again after navigation
       await DashboardScreenActions.verifyDashboardStructure($);
+      TestLogger.logTestSuccess($, 'Navigation test completed');
     },
   );
 }

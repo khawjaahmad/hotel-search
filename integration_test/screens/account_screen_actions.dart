@@ -1,19 +1,17 @@
-import 'package:flutter_test/flutter_test.dart';
 import 'package:patrol/patrol.dart';
 
+import '../helpers/test_logger.dart';
 import '../locators/app_locators.dart';
-import '../strings/test_strings.dart';
 
 class AccountScreenActions {
   static Future<void> verifyAccountPageStructure(
       PatrolIntegrationTester $) async {
-    $.log(AccountTestStrings.verifyingStructure);
+    TestLogger.logValidation($, 'account page structure');
 
     final locators = [
       AppLocators.getAccountScaffold($),
       AppLocators.getAccountAppBar($),
-      AppLocators.getAccountTitle($)
-          .containing(AccountTestStrings.accountTitle),
+      AppLocators.getAccountTitle($).containing('Your Account'),
       AppLocators.getAccountIcon($),
     ];
 
@@ -21,6 +19,13 @@ class AccountScreenActions {
       await locator.waitUntilExists();
     }
 
-    expect(AppLocators.getAccountAppBar($).evaluate(), hasLength(1));
+    // Use Patrol's built-in assertions instead of flutter_test
+    final appBarElements = AppLocators.getAccountAppBar($).evaluate();
+    if (appBarElements.length != 1) {
+      throw Exception(
+          'Expected exactly 1 app bar, found ${appBarElements.length}');
+    }
+
+    TestLogger.logTestSuccess($, 'Account page structure verified');
   }
 }

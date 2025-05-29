@@ -2,8 +2,8 @@ import 'package:patrol/patrol.dart';
 
 import '../config/patrol_config.dart';
 import '../helpers/test_helpers.dart';
+import '../helpers/test_logger.dart';
 import '../screens/hotels_screen_actions.dart';
-import '../strings/test_strings.dart';
 
 void main() {
   patrolSetUp(() async {
@@ -15,213 +15,237 @@ void main() {
   });
 
   patrolTest(
-    HotelsTestStrings.navigationTest,
+    'Hotels page navigation test',
     config: PatrolConfig.getConfig(),
     ($) async {
-      $.log(HotelsTestStrings.initializingTest);
+      TestLogger.logTestStart($, 'Hotels Navigation Test');
       await TestHelpers.initializeApp($);
 
-      $.log(HotelsTestStrings.navigatingToHotels);
+      TestLogger.logNavigation($, 'Hotels page');
       await HotelsScreenActions.navigateToHotelsPage($);
+
+      TestLogger.logTestSuccess($, 'Hotels navigation completed');
     },
   );
 
   patrolTest(
-    HotelsTestStrings.searchTest,
+    'Hotels search functionality test',
     config: PatrolConfig.getConfig(),
     ($) async {
-      $.log(HotelsTestStrings.initializingTest);
+      TestLogger.logTestStart($, 'Hotels Search Test');
       await TestHelpers.initializeApp($);
 
-      $.log(HotelsTestStrings.navigatingToHotels);
-      await TestHelpers.navigateToPage($, HotelsTestStrings.hotelsTabName);
+      TestLogger.logNavigation($, 'Hotels page');
+      await TestHelpers.navigateToPage($, 'hotels');
 
-      $.log(HotelsTestStrings.testingSearch);
+      TestLogger.logAction($, 'Testing search functionality');
       await HotelsScreenActions.performSearchTest($, 'Dubai');
+
+      TestLogger.logTestSuccess($, 'Search functionality verified');
     },
   );
 
   patrolTest(
-    HotelsTestStrings.scrollingTest,
+    'Hotels scrolling and pagination test',
     config: PatrolConfig.getConfig(),
     tags: ['demo'],
     ($) async {
-      $.log(HotelsTestStrings.initializingTest);
+      TestLogger.logTestStart($, 'Hotels Scrolling & Pagination Test');
       await TestHelpers.initializeApp($);
 
-      $.log(HotelsTestStrings.navigatingToHotels);
-      await TestHelpers.navigateToPage($, HotelsTestStrings.hotelsTabName);
+      TestLogger.logNavigation($, 'Hotels page');
+      await TestHelpers.navigateToPage($, 'hotels');
 
-      $.log(HotelsTestStrings.testingSearch);
+      TestLogger.logAction($, 'Performing search with London');
       await HotelsScreenActions.performSearchTest($, 'London');
 
-      $.log(HotelsTestStrings.testingScrolling);
+      TestLogger.logAction($, 'Testing scrolling and pagination');
       await HotelsScreenActions.testScrollingAndPagination($);
+
+      TestLogger.logTestSuccess($, 'Scrolling and pagination verified');
     },
   );
 
   patrolTest(
-    HotelsTestStrings.hotelCardsTest,
+    'Hotel cards validation test',
     config: PatrolConfig.getConfig(),
     ($) async {
-      $.log(HotelsTestStrings.initializingTest);
+      TestLogger.logTestStart($, 'Hotel Cards Validation Test');
       await TestHelpers.initializeApp($);
 
-      $.log(HotelsTestStrings.navigatingToHotels);
-      await TestHelpers.navigateToPage($, HotelsTestStrings.hotelsTabName);
+      TestLogger.logNavigation($, 'Hotels page');
+      await TestHelpers.navigateToPage($, 'hotels');
 
-      $.log(HotelsTestStrings.testingSearch);
+      TestLogger.logAction($, 'Searching for Paris hotels');
       await HotelsScreenActions.performSearchTest($, 'Paris');
 
-      $.log(HotelsTestStrings.validatingCards);
+      TestLogger.logValidation($, 'hotel cards structure');
       await HotelsScreenActions.validateHotelCards($);
+
+      TestLogger.logTestSuccess($, 'Hotel cards validation completed');
     },
   );
 
   patrolTest(
-    HotelsTestStrings.favoritesTest,
+    'Hotels favorites functionality test',
     config: PatrolConfig.getConfig(),
     ($) async {
-      $.log(HotelsTestStrings.initializingTest);
+      TestLogger.logTestStart($, 'Hotels Favorites Test');
       await TestHelpers.initializeApp($);
 
-      $.log('Clearing existing favorites');
+      TestLogger.logTestStep($, 'Clearing existing favorites');
       await TestHelpers.navigateToPage($, 'favorites');
       await HotelsScreenActions.clearExistingFavorites($);
 
-      $.log(HotelsTestStrings.navigatingToHotels);
-      await TestHelpers.navigateToPage($, HotelsTestStrings.hotelsTabName);
+      TestLogger.logNavigation($, 'Hotels page');
+      await TestHelpers.navigateToPage($, 'hotels');
 
-      $.log(HotelsTestStrings.testingSearch);
+      TestLogger.logAction($, 'Searching for Tokyo hotels');
       await HotelsScreenActions.performSearchTest($, 'Tokyo');
 
-      $.log(HotelsTestStrings.favoritingHotels);
+      TestLogger.logAction($, 'Adding hotels to favorites');
       await HotelsScreenActions.favoriteRandomHotels($);
 
-      $.log(HotelsTestStrings.validatingFavorites);
+      TestLogger.logValidation($, 'favorites page');
       await HotelsScreenActions.validateFavoritesPage($);
+
+      TestLogger.logTestSuccess($, 'Favorites functionality verified');
     },
   );
 
   patrolTest(
-    HotelsTestStrings.removeFavoritesTest,
+    'Remove favorites functionality test',
     config: PatrolConfig.getConfig(),
     ($) async {
-      $.log(HotelsTestStrings.initializingTest);
+      TestLogger.logTestStart($, 'Remove Favorites Test');
       await TestHelpers.initializeApp($);
 
-      $.log(HotelsTestStrings.navigatingToHotels);
-      await TestHelpers.navigateToPage($, HotelsTestStrings.hotelsTabName);
+      TestLogger.logNavigation($, 'Hotels page');
+      await TestHelpers.navigateToPage($, 'hotels');
 
-      $.log('Adding hotels to favorites for removal test');
+      TestLogger.logTestStep($, 'Adding hotels to favorites for removal test');
       await HotelsScreenActions.performSearchTest($, 'New York');
       await HotelsScreenActions.favoriteRandomHotels($);
 
-      $.log(HotelsTestStrings.navigatingToFavorites);
+      TestLogger.logNavigation($, 'Favorites page');
       await TestHelpers.navigateToPage($, 'favorites');
 
-      $.log(HotelsTestStrings.removingFavorites);
+      TestLogger.logAction($, 'Removing favorited hotels');
       await HotelsScreenActions.removeFavoriteHotels($);
+
+      TestLogger.logTestSuccess($, 'Remove favorites functionality verified');
     },
   );
 
   patrolTest(
-    HotelsTestStrings.negativeSearchTest,
+    'Negative search scenarios test',
     config: PatrolConfig.getConfig(),
     ($) async {
-      $.log(HotelsTestStrings.initializingTest);
+      TestLogger.logTestStart($, 'Negative Search Scenarios Test');
       await TestHelpers.initializeApp($);
 
-      $.log(HotelsTestStrings.navigatingToHotels);
-      await TestHelpers.navigateToPage($, HotelsTestStrings.hotelsTabName);
+      TestLogger.logNavigation($, 'Hotels page');
+      await TestHelpers.navigateToPage($, 'hotels');
 
-      $.log(HotelsTestStrings.testingNegativeScenarios);
+      TestLogger.logAction($, 'Testing negative search scenarios');
       await HotelsScreenActions.testNegativeSearchScenarios($);
+
+      TestLogger.logTestSuccess($, 'Negative search scenarios verified');
     },
   );
 
   patrolTest(
-    HotelsTestStrings.errorHandlingTest,
+    'Error handling test',
     config: PatrolConfig.getConfig(),
     ($) async {
-      $.log(HotelsTestStrings.initializingTest);
+      TestLogger.logTestStart($, 'Error Handling Test');
       await TestHelpers.initializeApp($);
 
-      $.log(HotelsTestStrings.navigatingToHotels);
-      await TestHelpers.navigateToPage($, HotelsTestStrings.hotelsTabName);
+      TestLogger.logNavigation($, 'Hotels page');
+      await TestHelpers.navigateToPage($, 'hotels');
 
-      $.log('Testing empty search input');
+      TestLogger.logAction($, 'Testing empty search input');
       await HotelsScreenActions.testEmptySearchInput($);
 
-      $.log('Testing special characters in search - FIXED VERSION');
+      TestLogger.logAction($, 'Testing special characters in search');
       await HotelsScreenActions.testSpecialCharacterSearch($);
 
-      $.log('Testing very long search query');
+      TestLogger.logAction($, 'Testing very long search query');
       await HotelsScreenActions.testLongSearchQuery($);
+
+      TestLogger.logTestSuccess($, 'Error handling verified');
     },
   );
 
   patrolTest(
-    HotelsTestStrings.crossPageNavigationTest,
+    'Cross-page navigation test',
     config: PatrolConfig.getConfig(),
     ($) async {
-      $.log(HotelsTestStrings.initializingTest);
+      TestLogger.logTestStart($, 'Cross-page Navigation Test');
       await TestHelpers.initializeApp($);
 
-      $.log('Testing cross-page navigation with favorites');
-      await TestHelpers.navigateToPage($, HotelsTestStrings.hotelsTabName);
+      TestLogger.logTestStep($, 'Testing cross-page navigation with favorites');
+      await TestHelpers.navigateToPage($, 'hotels');
 
       await HotelsScreenActions.performSearchTest($, 'Berlin');
       await HotelsScreenActions.favoriteRandomHotels($);
 
-      $.log('Testing navigation flow: Hotels -> Favorites -> Hotels');
+      TestLogger.logTestStep(
+          $, 'Testing navigation flow: Hotels -> Favorites -> Hotels');
       await TestHelpers.navigateToPage($, 'favorites');
       await HotelsScreenActions.validateFavoritesPage($);
 
-      await TestHelpers.navigateToPage($, HotelsTestStrings.hotelsTabName);
+      await TestHelpers.navigateToPage($, 'hotels');
       await HotelsScreenActions.verifyHotelsPageStructure($);
 
       await TestHelpers.navigateToPage($, 'favorites');
       await HotelsScreenActions.validateFavoritesPage($);
 
       await HotelsScreenActions.removeFavoriteHotels($);
+
+      TestLogger.logTestSuccess($, 'Cross-page navigation verified');
     },
   );
 
   patrolTest(
-    HotelsTestStrings.searchPersistenceTest,
+    'Search persistence test',
     config: PatrolConfig.getConfig(),
     ($) async {
-      $.log(HotelsTestStrings.initializingTest);
+      TestLogger.logTestStart($, 'Search Persistence Test');
       await TestHelpers.initializeApp($);
 
-      $.log(HotelsTestStrings.navigatingToHotels);
-      await TestHelpers.navigateToPage($, HotelsTestStrings.hotelsTabName);
+      TestLogger.logNavigation($, 'Hotels page');
+      await TestHelpers.navigateToPage($, 'hotels');
 
       const searchQuery = 'Barcelona';
-      $.log('Testing search persistence with query: $searchQuery');
+      TestLogger.logAction(
+          $, 'Testing search persistence with query: $searchQuery');
       await HotelsScreenActions.performSearchTest($, searchQuery);
 
-      $.log('Navigating away to test search persistence');
+      TestLogger.logTestStep($, 'Navigating away to test search persistence');
       await TestHelpers.navigateToPage($, 'account');
 
-      $.log('Navigating back to Hotels');
-      await TestHelpers.navigateToPage($, HotelsTestStrings.hotelsTabName);
+      TestLogger.logNavigation($, 'back to Hotels');
+      await TestHelpers.navigateToPage($, 'hotels');
 
-      $.log('Verifying search state after navigation');
+      TestLogger.logValidation($, 'search state after navigation');
       await HotelsScreenActions.verifySearchStateAfterNavigation($);
+
+      TestLogger.logTestSuccess($, 'Search persistence verified');
     },
   );
 
   patrolTest(
-    HotelsTestStrings.comprehensiveTest,
+    'Comprehensive Hotels feature test',
     config: PatrolConfig.getConfig(),
     ($) async {
-      $.log(HotelsTestStrings.initializingTest);
+      TestLogger.logTestStart($, 'Comprehensive Hotels Feature Test');
       await TestHelpers.initializeApp($);
 
-      $.log('Running comprehensive Hotels feature test');
+      TestLogger.logTestStep($, 'Running comprehensive Hotels feature test');
       await HotelsScreenActions.runCompleteHotelsTest($);
+
+      TestLogger.logTestSuccess($, 'Comprehensive test suite completed');
     },
   );
 }

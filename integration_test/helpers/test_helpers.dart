@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:flutter_test/flutter_test.dart';
 import 'package:get_it/get_it.dart';
 import 'package:hive/hive.dart';
 import 'package:hotel_booking/core/di/injectable.dart';
@@ -9,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:patrol/patrol.dart';
 
 import '../locators/app_locators.dart';
+import 'test_logger.dart';
 
 class TestHelpers {
   static bool _dependenciesConfigured = false;
@@ -20,11 +20,8 @@ class TestHelpers {
 
     try {
       await GetIt.instance.reset();
-
       await _initializeHiveForTesting();
-
       configureDependencies();
-
       _dependenciesConfigured = true;
     } catch (e) {
       _dependenciesConfigured = false;
@@ -71,10 +68,10 @@ class TestHelpers {
     String? description,
   }) async {
     try {
+      TestLogger.logNavigation($, tabName);
       final tabFinder = AppLocators.getNavigationTab($, tabName);
 
       await tabFinder.waitUntilVisible();
-
       await tabFinder.tap();
 
       await $.pump(const Duration(milliseconds: 500));
@@ -92,7 +89,9 @@ class TestHelpers {
         await GetIt.instance.reset();
         _dependenciesConfigured = false;
       }
-    } catch (e) {}
+    } catch (e) {
+      // Intentionally empty - cleanup errors should not fail tests
+    }
   }
 
   static void resetTestState() {

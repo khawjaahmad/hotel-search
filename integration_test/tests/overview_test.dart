@@ -2,6 +2,7 @@ import 'package:patrol/patrol.dart';
 
 import '../config/patrol_config.dart';
 import '../helpers/test_helpers.dart';
+import '../helpers/test_logger.dart';
 import '../screens/overview_screen_actions.dart';
 
 void main() {
@@ -17,10 +18,10 @@ void main() {
     'Overview structure test',
     config: PatrolConfig.getConfig(),
     ($) async {
-      $.log('Initializing overview test');
+      TestLogger.logTestStart($, 'Overview Structure Test');
       await TestHelpers.initializeApp($);
 
-      $.log('Verifying overview page structure');
+      TestLogger.logValidation($, 'overview page structure');
       await OverviewScreenActions.verifyOverviewPageStructure($);
     },
   );
