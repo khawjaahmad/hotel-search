@@ -143,7 +143,6 @@ app.*.map.json
 node_modules/
 
 # Other project-specific files
-Makefile
 README.md
 testing-strategy.md
 
