@@ -1,7 +1,7 @@
 # =============================================================================
 # HOTEL BOOKING QA AUTOMATION - MINIMAL MAKEFILE
 # =============================================================================
-# QA Automation Lead: Clean test automation suite
+# Clean test automation suite
 # =============================================================================
 
 .PHONY: help setup clean unit widget test-all coverage allure-test
