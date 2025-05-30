@@ -1,0 +1,14 @@
+workflows:
+  default:
+    scripts:
+      - name: Install Patrol CLI
+        script: dart pub global activate patrol_cli
+      - name: Launch Android emulator
+        script: |
+          cd $ANDROID_HOME/tools
+          emulator -avd emulator &
+          adb wait-for-device      
+      - name: Run tests with Patrol
+        script: patrol test -t integration_test/tests
+        ignore_failure: true
+...
