@@ -2,27 +2,27 @@ name: Firebase Test Lab - Android Integration Tests
 
 on:
   push:
-    branches: [ main, master, develop ]
+    branches: [main, master, develop]
     paths:
-      - 'lib/**'
-      - 'integration_test/**'
-      - 'android/**'
-      - 'pubspec.yaml'
-      - '.github/workflows/**'
+      - "lib/**"
+      - "integration_test/**"
+      - "android/**"
+      - "pubspec.yaml"
+      - ".github/workflows/**"
   pull_request:
-    branches: [ main, master, develop ]
+    branches: [main, master, develop]
     paths:
-      - 'lib/**'
-      - 'integration_test/**'
-      - 'android/**'
-      - 'pubspec.yaml'
+      - "lib/**"
+      - "integration_test/**"
+      - "android/**"
+      - "pubspec.yaml"
 
 jobs:
   android_integration_tests:
     name: Android Integration Tests on Firebase
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -30,14 +30,14 @@ jobs:
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '17'
+          distribution: "temurin"
+          java-version: "17"
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.0'
-          channel: 'stable'
+          flutter-version: "3.24.0"
+          channel: "stable"
           cache: true
 
       - name: Setup Patrol CLI
@@ -60,7 +60,6 @@ jobs:
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ secrets.FIREBASE_PROJECT_ID }}
-
       - name: Enable Firebase Test Lab API
         run: |
           gcloud services enable testing.googleapis.com
@@ -78,17 +77,17 @@ jobs:
           echo "Checking for APK files..."
           ls -la build/app/outputs/apk/debug/ || echo "Debug APK directory not found"
           ls -la build/app/outputs/apk/androidTest/debug/ || echo "Test APK directory not found"
-          
+
           if [ ! -f "build/app/outputs/apk/debug/app-debug.apk" ]; then
             echo "❌ Main APK not found"
             exit 1
           fi
-          
+
           if [ ! -f "build/app/outputs/apk/androidTest/debug/app-debug-androidTest.apk" ]; then
             echo "❌ Test APK not found"
             exit 1
           fi
-          
+
           echo "✅ Both APK files found"
 
       - name: Run Tests on Firebase Test Lab
@@ -96,7 +95,7 @@ jobs:
           FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
         run: |
           echo "🚀 Running Android tests on Firebase Test Lab..."
-          
+
           gcloud firebase test android run \
             --type instrumentation \
             --app build/app/outputs/apk/debug/app-debug.apk \
@@ -127,6 +126,8 @@ jobs:
     name: Android Tests (Parallel)
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      FIREBASE_PROJECT_ID: ${{ secrets.GOOGLE_CLOUD_SERVICE_ACCOUNT_KEY }}
     strategy:
       fail-fast: false
       matrix:
@@ -135,7 +136,7 @@ jobs:
           - integration_test/tests/hotels_test.dart
           - integration_test/tests/account_test.dart
           - integration_test/tests/overview_test.dart
-    
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -143,14 +144,14 @@ jobs:
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '17'
+          distribution: "temurin"
+          java-version: "17"
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.0'
-          channel: 'stable'
+          flutter-version: "3.24.0"
+          channel: "stable"
           cache: true
 
       - name: Setup Patrol CLI
@@ -171,19 +172,16 @@ jobs:
 
       - name: Setup Google Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
-        with:
-          project_id: ${{ secrets.FIREBASE_PROJECT_ID }}
-
       - name: Run Individual Test on Firebase
         env:
           TEST_TARGET: ${{ matrix.test_target }}
           FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
         run: |
           echo "🧪 Testing: $TEST_TARGET"
-          
+
           # Build APKs for specific test
           patrol build android --target="$TEST_TARGET" --release
-          
+
           # Run on Firebase Test Lab
           gcloud firebase test android run \
             --type instrumentation \

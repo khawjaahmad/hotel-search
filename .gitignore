@@ -17,7 +17,7 @@ migrate_working_dir/
 .env
 .env.*
 .metadata
-
+lib/env.g.dart
 # IntelliJ related
 *.iml
 *.ipr
@@ -43,8 +43,7 @@ build/
 !/pubspec.lock
 **/doc/api/
 lib/generated_plugin_registrant.dart
-lib/env.g.dart
-*.g.dart
+
 *.freezed.dart
 *.gen.dart
 *.gr.dart
@@ -127,6 +126,7 @@ windows/Runner.exe.config
 # Test and coverage
 coverage/
 screenshots/
+firebase_android_bu.sh/
 allure/
 allure-report/
 allure-results/
