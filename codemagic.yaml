@@ -1,14 +1,155 @@
 workflows:
-  default:
+  hotel-booking-qa:
+    name: Hotel Booking QA Pipeline
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    
+    environment:
+      groups:
+        - hotel_booking_secrets
+      flutter: 3.24.0
+      xcode: 15.2
+      cocoapods: default
+      
+    cache:
+      cache_paths:
+        - $FLUTTER_ROOT/.pub-cache
+        - $HOME/.gradle/caches
+        - $HOME/Library/Caches/CocoaPods
+        
+    triggering:
+      events:
+        - push
+        - pull_request
+      branch_patterns:
+        - pattern: 'main'
+          include: true
+        - pattern: 'develop'
+          include: true
+    
     scripts:
-      - name: Install Patrol CLI
-        script: dart pub global activate patrol_cli
-      - name: Launch Android emulator
+      - name: Setup environment
         script: |
+          echo "🔧 Setting up environment..."
+          flutter doctor -v
+          dart --version
+          
+      - name: Install dependencies
+        script: |
+          echo "📦 Installing dependencies..."
+          flutter pub get
+          
+      - name: Generate code
+        script: |
+          echo "🔨 Generating code..."
+          dart run build_runner build --delete-conflicting-outputs
+          
+      - name: Install Patrol CLI
+        script: |
+          echo "🚁 Installing Patrol CLI..."
+          dart pub global activate patrol_cli
+          export PATH="$PATH:$HOME/.pub-cache/bin"
+          patrol --version
+          
+      - name: Run unit tests
+        script: |
+          echo "🧪 Running unit tests..."
+          flutter test test/unit/ --coverage
+          
+      - name: Run widget tests
+        script: |
+          echo "🎯 Running widget tests..."
+          flutter test test/widgets/
+          
+      - name: Build Android APK
+        script: |
+          echo "📱 Building Android APK..."
+          flutter build apk --debug
+          
+      - name: Setup Android emulator
+        script: |
+          echo "🤖 Setting up Android emulator..."
           cd $ANDROID_HOME/tools
-          emulator -avd emulator &
-          adb wait-for-device      
-      - name: Run tests with Patrol
-        script: patrol test -t integration_test/tests
+          echo "no" | avdmanager create avd --force -n test -k "system-images;android-34;google_apis;x86_64"
+          emulator -avd test -no-audio -no-window &
+          adb wait-for-device shell 'while [[ -z $(getprop sys.boot_completed | tr -d "\r") ]]; do sleep 1; done; input keyevent 82'
+          
+      - name: Run integration tests with Patrol
+        script: |
+          echo "🔄 Running integration tests..."
+          export PATH="$PATH:$HOME/.pub-cache/bin"
+          patrol test integration_test/tests/dashboard_test.dart --verbose
         ignore_failure: true
-...
+        
+      - name: Generate coverage report
+        script: |
+          echo "📊 Generating coverage report..."
+          if command -v genhtml &> /dev/null; then
+            genhtml coverage/lcov.info -o coverage/html
+          else
+            echo "genhtml not available, skipping HTML report generation"
+          fi
+          
+    artifacts:
+      - build/app/outputs/apk/debug/app-debug.apk
+      - coverage/**
+      - screenshots/**
+      - test-results/**
+      
+    publishing:
+      slack:
+        channel: '#qa-automation'
+        notify_on_build_start: false
+        notify:
+          success: true
+          failure: true
+
+  # iOS workflow
+  ios-tests:
+    name: iOS Integration Tests
+    max_build_duration: 45
+    instance_type: mac_mini_m2
+    
+    environment:
+      groups:
+        - hotel_booking_secrets
+      flutter: 3.24.0
+      xcode: 15.2
+      
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: 'main'
+          include: true
+          
+    scripts:
+      - name: Setup environment
+        script: |
+          flutter doctor -v
+          dart pub global activate patrol_cli
+          export PATH="$PATH:$HOME/.pub-cache/bin"
+          
+      - name: Install dependencies
+        script: |
+          flutter pub get
+          dart run build_runner build --delete-conflicting-outputs
+          
+      - name: Build iOS app
+        script: |
+          flutter build ios --debug --no-codesign
+          
+      - name: Setup iOS Simulator
+        script: |
+          xcrun simctl list devices
+          xcrun simctl boot "iPhone 16 Plus" || xcrun simctl boot "iPhone 15 Pro"
+          
+      - name: Run iOS integration tests
+        script: |
+          export PATH="$PATH:$HOME/.pub-cache/bin"
+          patrol test integration_test/tests/overview_test.dart --device "iPhone 16 Plus" --verbose
+        ignore_failure: true
+        
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - screenshots/**

@@ -443,7 +443,6 @@ class AppLocators {
           finder.exists;
       }
     } catch (e) {
-      // Performance measurement continues even on error
     }
 
     stopwatch.stop();

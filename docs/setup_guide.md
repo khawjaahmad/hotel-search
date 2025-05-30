@@ -29,6 +29,7 @@ Before starting, ensure you have the following installed:
 - **Android Emulator** or physical device
 
 ### Testing Tools
+
 - **Patrol CLI**: `dart pub global activate patrol_cli`
 - **Node.js** 18+ (for Allure reports): [nodejs.org](https://nodejs.org/)
 

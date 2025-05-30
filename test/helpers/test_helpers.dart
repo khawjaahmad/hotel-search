@@ -4,7 +4,6 @@ import 'package:hotel_booking/features/favorites/presentation/bloc/favorites_blo
 import 'package:hotel_booking/features/hotels/presentation/bloc/hotels_bloc.dart';
 
 class WidgetTestHelpers {
-  /// Creates a Material App wrapper for widget testing
   static Widget createTestApp({
     required Widget child,
     FavoritesBloc? favoritesBloc,
@@ -24,7 +23,6 @@ class WidgetTestHelpers {
     );
   }
 
-  /// Creates a test app with navigation support
   static Widget createTestAppWithRouter({
     required Widget child,
     FavoritesBloc? favoritesBloc,
@@ -44,7 +42,6 @@ class WidgetTestHelpers {
     );
   }
 
-  /// Creates a Material App with specific theme for testing
   static Widget createTestAppWithTheme({
     required Widget child,
     required ThemeData theme,
@@ -65,7 +62,6 @@ class WidgetTestHelpers {
     );
   }
 
-  /// Creates a basic scaffold wrapper
   static Widget createScaffoldWrapper(Widget child) {
     return MaterialApp(
       home: Scaffold(

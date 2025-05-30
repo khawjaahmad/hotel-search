@@ -19,7 +19,6 @@ class AccountScreenActions {
       await locator.waitUntilExists();
     }
 
-    // Use Patrol's built-in assertions instead of flutter_test
     final appBarElements = AppLocators.getAccountAppBar($).evaluate();
     if (appBarElements.length != 1) {
       throw Exception(
