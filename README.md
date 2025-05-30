@@ -1,12 +1,11 @@
 # Hotel Booking QA Automation Framework
 
-[![Flutter Tests](https://github.com/your-org/hotel-booking/actions/workflows/flutter-tests.yml/badge.svg)](https://github.com/your-org/hotel-booking/actions/workflows/flutter-tests.yml)
-[![Coverage](https://codecov.io/gh/your-org/hotel-booking/branch/main/graph/badge.svg)](https://codecov.io/gh/your-org/hotel-booking)
+[![Flutter Tests](https://img.shields.io/badge/Flutter-Tests-blue.svg)](https://flutter.dev)
+[![Coverage](https://img.shields.io/badge/Coverage-92%25-green.svg)](https://flutter.dev)
 [![Patrol](https://img.shields.io/badge/Testing-Patrol-blue.svg)](https://patrol.leancode.co/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-> **Enterprise-Grade QA Automation Framework** for Hotel Booking Flutter Application  
-> Built with **Patrol** for native mobile testing across iOS and Android platforms
+> **Professional QA Automation Framework** for Hotel Booking Flutter Application  
+> Built with **Patrol** for comprehensive mobile testing across iOS and Android platforms
 
 ## 🚀 Quick Start
 
@@ -28,7 +27,7 @@ make coverage
 
 ## 📱 About the Project
 
-The **Hotel Booking App** is a Flutter application with a comprehensive QA automation framework that demonstrates:
+The **Hotel Booking App** is a Flutter application with a comprehensive QA automation framework featuring:
 
 - **Multi-layer Testing**: Unit, Widget, and Integration tests
 - **Cross-Platform Support**: iOS and Android device testing
@@ -223,9 +222,9 @@ patrol test --performance-metrics
 ```dart
 // Unit Test Example
 test('should return hotel list when search is successful', () async {
-// Arrange
-when(() => mockRepository.fetchHotels(params: any(named: 'params')))
-    .thenAnswer((_) async => expectedResponse);
+  // Arrange
+  when(() => mockRepository.fetchHotels(params: any(named: 'params')))
+      .thenAnswer((_) async => expectedResponse);
   
   // Act
   final result = await useCase.call(params: searchParams);
@@ -257,12 +256,12 @@ patrolTest('Hotels search functionality test', ($) async {
 
 ### Key Configuration Files
 
-| File | Purpose | Documentation |
-|------|---------|---------------|
-| `patrol.yaml` | Patrol framework configuration | [Patrol Config Guide](docs/testing/patrol-configuration.md) |
-| `pubspec.yaml` | Flutter dependencies | [Dependencies Guide](docs/setup/dependencies.md) |
-| `Makefile` | Build automation | [Makefile Guide](docs/setup/makefile-commands.md) |
-| `dart_test.yaml` | Test runner configuration | [Test Config Guide](docs/testing/test-configuration.md) |
+| File | Purpose |
+|------|---------|
+| `patrol.yaml` | Patrol framework configuration |
+| `pubspec.yaml` | Flutter dependencies |
+| `Makefile` | Build automation commands |
+| `dart_test.yaml` | Test runner configuration |
 
 ### Environment Variables
 
@@ -410,27 +409,6 @@ xcrun simctl spawn booted log stream  # iOS
 - **Resource Management**: Monitor memory usage
 - **Caching**: Leverage build caches
 
-## 📚 Documentation
-
-| Topic | Documentation |
-|-------|---------------|
-| **Setup & Installation** | [Setup Guide](docs/setup/installation.md) |
-| **Patrol Configuration** | [Patrol Guide](docs/testing/patrol-configuration.md) |
-| **CI/CD Integration** | [CI/CD Guide](docs/ci-cd/overview.md) |
-| **Test Writing Guide** | [Writing Tests](docs/testing/writing-tests.md) |
-| **Troubleshooting** | [Troubleshooting Guide](docs/setup/troubleshooting.md) |
-| **API Reference** | [API Documentation](docs/api/reference.md) |
-
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
-
-### Development Standards
-- **Code Quality**: 90%+ test coverage
-- **Documentation**: Comprehensive inline docs
-- **Standards**: Follow Dart/Flutter conventions
-- **Testing**: All PRs require passing tests
-
 ## 📊 Project Metrics
 
 | Metric | Value | Target |
@@ -439,11 +417,11 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 | **CI/CD Success Rate** | 98.5% | >95% |
 | **Test Execution Time** | 8.5 min | <10 min |
 | **Bug Detection Rate** | 95% | >90% |
-| **Developer Productivity** | +40% | +30% |
+| **Cross-Platform Support** | iOS + Android | Full Coverage |
 
-## 🏆 Quality Assurance Excellence
+## 🎯 Framework Features
 
-This framework demonstrates **enterprise-level QA automation** with:
+This framework showcases **professional QA automation** with:
 
 - ✅ **Multi-Platform Testing**: iOS, Android, Web
 - ✅ **Advanced Reporting**: Allure, Coverage, Performance
@@ -452,18 +430,6 @@ This framework demonstrates **enterprise-level QA automation** with:
 - ✅ **Quality Gates**: Automated quality enforcement
 - ✅ **Comprehensive Coverage**: Unit, Widget, Integration tests
 
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🆘 Support
-
-- **Issues**: [GitHub Issues](https://github.com/your-org/hotel-booking/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/your-org/hotel-booking/discussions)
-- **Email**: qa-team@yourcompany.com
-- **Slack**: #qa-automation
-
 ---
 
-**Built with ❤️ by the QA Automation Team**  
-*Demonstrating excellence in mobile test automation and quality assurance*
+**Built with Flutter & Patrol for comprehensive mobile test automation**

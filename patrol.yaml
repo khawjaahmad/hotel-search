@@ -1,5 +1,3 @@
-# patrol.yaml - Configuration file for Patrol
-
 # Device configurations
 devices:
   ios: "iPhone 16 Plus"
