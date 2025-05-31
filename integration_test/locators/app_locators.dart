@@ -443,6 +443,7 @@ class AppLocators {
           finder.exists;
       }
     } catch (e) {
+      // Intentionally empty - cleanup errors should not fail tests
     }
 
     stopwatch.stop();

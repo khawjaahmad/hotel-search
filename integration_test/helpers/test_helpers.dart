@@ -90,6 +90,7 @@ class TestHelpers {
         _dependenciesConfigured = false;
       }
     } catch (e) {
+      // Intentionally empty - cleanup errors should not fail tests
     }
   }
 
