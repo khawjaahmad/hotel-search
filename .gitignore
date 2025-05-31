@@ -155,3 +155,6 @@ Thumbs.db
 lib/env.g.dart
 lib/core/di/injectable.config.dart
 lib/core/navigation/app_router.gr.dart
+.env
+.env.*
+lib/env.g.dart*
