@@ -147,3 +147,11 @@ testing-strategy.md
 
 # Temporary files
 Thumbs.db
+
+# Generated files
+*.g.dart
+*.gr.dart
+*.config.dart
+lib/env.g.dart
+lib/core/di/injectable.config.dart
+lib/core/navigation/app_router.gr.dart
