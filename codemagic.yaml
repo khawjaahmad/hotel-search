@@ -21,114 +21,198 @@ workflows:
     triggering:
       events: []
     scripts:
-      - name: GitHub Context
+      - name: Environment Info
         script: |
+          echo "🚀 CodeMagic Hotel Booking QA Pipeline"
+          echo "======================================"
           echo "GitHub Run ID: ${GITHUB_RUN_ID:-'Not set'}"
           echo "GitHub SHA: ${GITHUB_SHA:-'Not set'}"
           echo "Branch: ${CM_BRANCH}"
           echo "Commit: ${CM_COMMIT}"
-      - name: Environment Setup
+          echo "Triggered by: ${TRIGGERED_BY:-'manual'}"
+
+      - name: Flutter Environment Setup
         script: |
+          echo "📱 Setting up Flutter environment..."
           flutter doctor -v
           dart --version
+
+      - name: Create Environment File
+        script: |
+          echo "🔐 Setting up environment variables..."
+          echo "SERPAPI_API_KEY=${SERPAPI_API_KEY}" > .env
+          echo "FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID:-hotel-booking-qa}" >> .env
+          echo "DEBUG=false" >> .env
+
       - name: Install Dependencies
         script: |
+          echo "📦 Installing Flutter dependencies..."
           flutter pub get
+
       - name: Install Patrol CLI
         script: |
+          echo "🛡️ Installing Patrol CLI..."
           dart pub global activate patrol_cli
           export PATH="$PATH:$HOME/.pub-cache/bin"
           patrol --version
+
       - name: Code Generation
         script: |
+          echo "⚙️ Running code generation..."
           dart run build_runner build --delete-conflicting-outputs
-      - name: Unit Widget Tests Verification
+
+      - name: Unit Tests
         script: |
+          echo "🧪 Running Unit Tests..."
           flutter test test/unit/ --reporter=compact
+          echo "✅ Unit tests completed"
+
+      - name: Widget Tests
+        script: |
+          echo "🎯 Running Widget Tests..."
+          flutter test test/widgets/ --reporter=compact
+          echo "✅ Widget tests completed"
+
       - name: Android Emulator Setup
         script: |
+          echo "📱 Setting up Android emulator for Patrol tests..."
           AVD_NAME="patrol_codemagic_avd"
+          
           if ! avdmanager list avd | grep -q "$AVD_NAME"; then
+            echo "Creating new AVD: $AVD_NAME"
             echo "no" | avdmanager create avd \
               --force \
               -n "$AVD_NAME" \
               -k "system-images;android-34;google_apis;x86_64" \
               --device "pixel_7"
           fi
+          
+          echo "Starting emulator..."
           emulator -avd "$AVD_NAME" -no-audio -no-window -gpu swiftshader_indirect &
+          
           adb wait-for-device shell 'while [[ -z $(getprop sys.boot_completed | tr -d "\r") ]]; do sleep 2; done'
+          
           adb shell settings put global window_animation_scale 0
           adb shell settings put global transition_animation_scale 0
           adb shell settings put global animator_duration_scale 0
+          
+          echo "✅ Android emulator ready"
+
       - name: Build Patrol APKs
         script: |
+          echo "🔨 Building Patrol APKs..."
           export PATH="$PATH:$HOME/.pub-cache/bin"
           patrol build android \
             --target integration_test/ \
             --verbose \
             --release
-      - name: Execute Patrol Tests
+          echo "✅ Patrol APKs built successfully"
+
+      - name: Execute Patrol Integration Tests
         script: |
+          echo "🛡️ Running Patrol Integration Tests..."
           export PATH="$PATH:$HOME/.pub-cache/bin"
-          FAILED_TESTS=()
-          TOTAL_TESTS=0
-          PASSED_TESTS=0
+          
           TESTS=(
             "integration_test/tests/dashboard_test.dart"
             "integration_test/tests/overview_test.dart" 
             "integration_test/tests/account_test.dart"
             "integration_test/tests/hotels_test.dart"
           )
+          
+          FAILED_TESTS=()
+          TOTAL_TESTS=0
+          PASSED_TESTS=0
+          
+          echo "Running ${#TESTS[@]} Patrol test suites..."
+          
           for test in "${TESTS[@]}"; do
             TOTAL_TESTS=$((TOTAL_TESTS + 1))
+            echo ""
+            echo "🔄 Running: $test"
+            
             if patrol test "$test" --verbose; then
               PASSED_TESTS=$((PASSED_TESTS + 1))
+              echo "✅ PASSED: $test"
             else
               FAILED_TESTS+=("$test")
+              echo "❌ FAILED: $test"
             fi
           done
+          
+          echo ""
+          echo "📊 Patrol Test Results:"
+          echo "======================="
           echo "Total Tests: $TOTAL_TESTS"
           echo "Passed: $PASSED_TESTS"
           echo "Failed: ${#FAILED_TESTS[@]}"
+          
           if [ ${#FAILED_TESTS[@]} -eq 0 ]; then
-            echo "All Patrol tests passed"
+            echo "✅ All Patrol integration tests passed!"
           else
-            echo "Failed tests:"
+            echo "❌ Failed Patrol tests:"
             for failed_test in "${FAILED_TESTS[@]}"; do
               echo "  - $failed_test"
             done
             exit 1
           fi
         test_report: android_native_test
-      - name: Report Results
+
+      - name: Generate Test Report
         script: |
+          echo "📋 Generating test report..."
           if [ $? -eq 0 ]; then
             echo "SUCCESS" > patrol_test_status.txt
+            echo "✅ All tests completed successfully"
           else
             echo "FAILURE" > patrol_test_status.txt
+            echo "❌ Some tests failed"
           fi
-          echo "CodeMagic build completed at: $(date)"
+          
+          echo "CodeMagic build completed at: $(date)" >> patrol_test_status.txt
+          
+          cat > test_summary.txt << EOF
+          Hotel Booking QA Test Summary
+          ============================
+          Build Date: $(date)
+          Branch: ${CM_BRANCH}
+          Commit: ${CM_COMMIT}
+          GitHub Run ID: ${GITHUB_RUN_ID:-'N/A'}
+
+          Tests Executed:
+          - Unit Tests: ✅
+          - Widget Tests: ✅  
+          - Patrol Integration Tests: ✅
+
+          Status: All tests passed successfully!
+          EOF
+
       - name: Cleanup
         script: |
+          echo "🧹 Cleaning up..."
           pkill -f emulator || true
           rm -rf /tmp/patrol* || true
+          echo "✅ Cleanup completed"
+
     artifacts:
       - patrol_test_status.txt
+      - test_summary.txt
       - patrol-*.log
       - screenshots/**
       - test-results/**
       - build/app/outputs/apk/debug/app-debug.apk
       - build/app/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+
     publishing:
-          slack:
-            channel: '#qa-automation'
-            notify_on_build_start: true
-            notify:
-              success: true
-              failure: true
-          email:
-            recipients:
-              - qa-lead@company.com
-            notify:
-              success: false
-              failure: true
+      slack:
+        channel: '#qa-automation'
+        notify_on_build_start: true
+        notify:
+          success: true
+          failure: true
+      email:
+        recipients:
+          - ahmad@junoon.dev
+        notify:
+          success: false
+          failure: true

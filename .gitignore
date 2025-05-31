@@ -17,8 +17,20 @@ migrate_working_dir/
 .metadata
 Thumbs.db
 
-# Environment Files
+# Environment Files - NEVER COMMIT THESE
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+google-services.json
+GoogleService-Info.plist
 
+# API Keys and Secrets
+**/api_keys.dart
+**/secrets.dart
+firebase_options.dart
 
 # IDE related
 *.iml
@@ -58,8 +70,12 @@ lib/generated_plugin_registrant.dart
 *.pbserver.dart
 *.pbjson.dart
 
+# Specific generated files
 lib/core/di/injectable.config.dart
 lib/core/navigation/app_router.gr.dart
+lib/env.g.dart
+lib/i18n/strings.g.dart
+lib/i18n/strings_*.g.dart
 
 # Flutter specific
 flutter_*.png
@@ -83,6 +99,7 @@ android/**/gradle-wrapper.jar
 android/captures/
 android/**/GeneratedPluginRegistrant.java
 android/key.properties
+android/app/google-services.json
 
 # iOS/XCode related
 ios/.build/
@@ -109,6 +126,7 @@ ios/**/Icon?
 ios/**/.symlinks/
 ios/**/profile
 ios/**/xcuserdata
+ios/Runner/GoogleService-Info.plist
 
 # Desktop related
 macos/Flutter/ephemeral/
@@ -120,7 +138,7 @@ windows/build/
 windows/Runner.exe
 windows/Runner.exe.config
 
-# Test and coverage
+# Test and coverage artifacts
 coverage/
 screenshots/
 firebase_android_bu.sh/
@@ -131,6 +149,14 @@ test-output/
 test-reports/
 test-results/
 test_results/
+patrol-*.log
+*.log
+
+# Firebase
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
 
 # Symbolication related
 app.*.symbols
@@ -139,6 +165,34 @@ app.*.map.json
 # Dependencies
 node_modules/
 
-# Project documentation
-README.md
-testing-strategy.md
+# CI/CD artifacts
+*.apk
+*.ipa
+*.aab
+build-artifacts/
+
+# Project documentation (if you don't want to commit them)
+# README.md
+# testing-strategy.md
+
+# Mac specific
+.DS_Store?
+ehthumbs.db
+Icon?
+Thumbs.db
+
+# Windows specific
+Desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+
+# Backup files
+*.backup
+*.bak
+*~
+
+# Lock files (except pubspec.lock which should be committed)
+package-lock.json
+yarn.lock
