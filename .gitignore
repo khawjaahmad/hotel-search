@@ -14,10 +14,14 @@
 .svn/
 .swiftpm/
 migrate_working_dir/
+.metadata
+Thumbs.db
+
+# Environment Files
 .env
 .env.*
-.metadata
-# IntelliJ related
+
+# IDE related
 *.iml
 *.ipr
 *.iws
@@ -43,14 +47,22 @@ build/
 **/doc/api/
 lib/generated_plugin_registrant.dart
 
+# Generated Files & Build Runner
 *.freezed.dart
 *.gen.dart
+*.g.dart
 *.gr.dart
+*.config.dart
 *.part
 *.pb.dart
 *.pbenum.dart
 *.pbserver.dart
 *.pbjson.dart
+lib/env.g.dart
+lib/core/di/injectable.config.dart
+lib/core/navigation/app_router.gr.dart
+
+# Flutter specific
 flutter_*.png
 flutter_*.snapshot
 flutter_export_environment.sh
@@ -81,14 +93,7 @@ ios/Runner.xcworkspace/
 ios/Runner.xcodeproj/project.xcworkspace/
 ios/Runner.xcodeproj/xcshareddata/
 ios/.xcconfig
-ios/Flutter/flutter_export_environment.sh
-ios/Flutter/Debug.xcconfig
-ios/Flutter/Release.xcconfig
-ios/Flutter/.last_build_id
-ios/Flutter/ephemeral
-ios/Flutter/Generated.xcconfig
-ios/Flutter/Flutter.framework
-ios/Flutter/Flutter.podspec
+ios/Flutter/
 ios/ServiceDefinitions.json
 ios/.generated/
 ios/**/*.mode1v3
@@ -106,18 +111,12 @@ ios/**/.symlinks/
 ios/**/profile
 ios/**/xcuserdata
 
-# macOS related
-macos/.DS_Store
+# Desktop related
 macos/Flutter/ephemeral/
 macos/Flutter/Flutter-Generated.xcconfig
 macos/Runner.xcworkspace/
-macos/Runner.xcodeproj/project.xcworkspace/
-macos/Runner.xcodeproj/xcshareddata/
-
-# Linux related
+macos/Runner.xcodeproj/
 linux/build/
-
-# Windows related
 windows/build/
 windows/Runner.exe
 windows/Runner.exe.config
@@ -134,27 +133,13 @@ test-reports/
 test-results/
 test_results/
 
-# Symbolication and obfuscation
+# Symbolication related
 app.*.symbols
 app.*.map.json
 
-# Node.js related
+# Dependencies
 node_modules/
 
-# Other project-specific files
+# Project documentation
 README.md
 testing-strategy.md
-
-# Temporary files
-Thumbs.db
-
-# Generated files
-*.g.dart
-*.gr.dart
-*.config.dart
-lib/env.g.dart
-lib/core/di/injectable.config.dart
-lib/core/navigation/app_router.gr.dart
-.env
-.env.*
-lib/env.g.dart*

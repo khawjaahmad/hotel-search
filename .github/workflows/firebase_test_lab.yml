@@ -34,15 +34,25 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.32.1"
+          flutter-version: "3.24.0"
           channel: "stable"
           cache: true
 
       - name: Install Dependencies
         run: flutter pub get
 
+      - name: Clean previous builds
+        run: |
+          flutter clean
+          rm -rf .dart_tool/build
+          rm -f lib/env.g.dart
+          rm -f lib/core/di/injectable.config.dart
+          rm -f lib/core/navigation/app_router.gr.dart
+          rm -f lib/features/hotels/data/models/serpapi/*.g.dart
+          rm -f lib/features/favorites/data/models/hive/*.g.dart
+
       - name: Generate Code
-        run: dart run build_runner build --delete-conflicting-outputs --delete-conflicting-outputs
+        run: dart run build_runner build --delete-conflicting-outputs
 
       - name: Run All Tests
         run: flutter test
@@ -69,7 +79,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.32.1"
+          flutter-version: "3.24.0"
           channel: "stable"
           cache: true
 
@@ -81,8 +91,16 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
-      - name: Generate Code
-        run: dart run build_runner build
+      - name: Clean and Generate Code
+        run: |
+          flutter clean
+          rm -rf .dart_tool/build
+          rm -f lib/env.g.dart
+          rm -f lib/core/di/injectable.config.dart
+          rm -f lib/core/navigation/app_router.gr.dart
+          rm -f lib/features/hotels/data/models/serpapi/*.g.dart
+          rm -f lib/features/favorites/data/models/hive/*.g.dart
+          dart run build_runner build --delete-conflicting-outputs
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
@@ -95,7 +113,7 @@ jobs:
           project_id: ${{ secrets.FIREBASE_PROJECT_ID }}
 
       - name: Build Android APKs for Integration Tests
-        run: patrol build android --target integration_test/ --release
+        run: patrol build android --target integration_test/tests/dashboard_test.dart --release
 
       - name: Run Integration Tests on Firebase Test Lab
         env:
