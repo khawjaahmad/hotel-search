@@ -12,7 +12,7 @@ dependencies:
   auto_route: ^9.2.2
   bloc: ^8.1.4
   bloc_concurrency: ^0.2.5
-  envied: ^1.0.0
+  # envied: ^1.0.0  # REMOVED - not needed for Firebase Test Lab
   equatable: ^2.0.7
   flutter_bloc: ^8.1.6
   bloc_test: ^9.1.5
@@ -35,7 +35,7 @@ dev_dependencies:
   allure_report: ^1.2.5
   test_reporter: ^1.0.0
   auto_route_generator: ^9.0.0
-  envied_generator: ^1.0.0
+  # envied_generator: ^1.0.0  # REMOVED - not needed
   injectable_generator: ^2.6.2
   mocktail: ^1.0.1
   json_serializable: ^6.9.0

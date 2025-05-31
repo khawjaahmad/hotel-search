@@ -11,17 +11,8 @@ on:
       - "pubspec.yaml"
   pull_request:
     branches: [main, master, develop]
-    paths:
-      - "lib/**"
-      - "test/**"
-      - "integration_test/**"
-      - "android/**"
-      - "pubspec.yaml"
 
 jobs:
-  # =============================================================================
-  # UNIT AND WIDGET TESTS - Run on GitHub Actions
-  # =============================================================================
   unit_and_widget_tests:
     name: Unit & Widget Tests
     runs-on: ubuntu-latest
@@ -41,25 +32,12 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
-      - name: Clean previous builds
-        run: |
-          flutter clean
-          rm -rf .dart_tool/build
-          rm -f lib/env.g.dart
-          rm -f lib/core/di/injectable.config.dart
-          rm -f lib/core/navigation/app_router.gr.dart
-          rm -f lib/features/hotels/data/models/serpapi/*.g.dart
-          rm -f lib/features/favorites/data/models/hive/*.g.dart
-
       - name: Generate Code
         run: dart run build_runner build --delete-conflicting-outputs
 
       - name: Run All Tests
         run: flutter test
 
-  # =============================================================================
-  # INTEGRATION TESTS - Run on Firebase Test Lab with Patrol
-  # =============================================================================
   firebase_integration_tests:
     name: Integration Tests (Firebase)
     runs-on: ubuntu-latest
@@ -91,16 +69,8 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
-      - name: Clean and Generate Code
-        run: |
-          flutter clean
-          rm -rf .dart_tool/build
-          rm -f lib/env.g.dart
-          rm -f lib/core/di/injectable.config.dart
-          rm -f lib/core/navigation/app_router.gr.dart
-          rm -f lib/features/hotels/data/models/serpapi/*.g.dart
-          rm -f lib/features/favorites/data/models/hive/*.g.dart
-          dart run build_runner build --delete-conflicting-outputs
+      - name: Generate Code (if needed)
+        run: dart run build_runner build --delete-conflicting-outputs
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
@@ -113,7 +83,7 @@ jobs:
           project_id: ${{ secrets.FIREBASE_PROJECT_ID }}
 
       - name: Build Android APKs for Integration Tests
-        run: patrol build android --target integration_test/tests/dashboard_test.dart --release
+        run: patrol build android --target integration_test/ --release
 
       - name: Run Integration Tests on Firebase Test Lab
         env:
@@ -124,7 +94,6 @@ jobs:
             --app build/app/outputs/apk/debug/app-debug.apk \
             --test build/app/outputs/apk/androidTest/debug/app-debug-androidTest.apk \
             --device model=shiba,version=34,locale=en,orientation=portrait \
-            --device model=e3q,version=34,locale=en,orientation=portrait \
             --timeout 20m \
             --results-bucket=${FIREBASE_PROJECT_ID}-test-results \
             --environment-variables clearPackageData=true \
