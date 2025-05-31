@@ -40,11 +40,13 @@ dev_dependencies:
   mocktail: ^1.0.1
   json_serializable: ^6.9.0
   slang_build_runner: ^4.4.0
-  analyzer: ^6.11.0
+  # Fixed analyzer version to be compatible with integration_test
+  analyzer: ^6.7.0  # Downgraded from ^6.11.0 to ^6.7.0
   patrol: ^3.15.2
   patrol_cli: ^3.5.0
   golden_toolkit: ^0.15.0
   mockito: ^5.4.2
+  # Keep integration_test for compatibility (even though using Patrol)
   integration_test:
     sdk: flutter
 
@@ -57,3 +59,5 @@ patrol:
     package_name: com.example.hotel_booking
   ios:
     bundle_id: com.ahmadwaqar.hotelBooking
+dependency_overrides:
+  collection: 1.18.0
