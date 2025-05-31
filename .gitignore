@@ -18,8 +18,7 @@ migrate_working_dir/
 Thumbs.db
 
 # Environment Files
-.env
-.env.*
+
 
 # IDE related
 *.iml
@@ -58,7 +57,7 @@ lib/generated_plugin_registrant.dart
 *.pbenum.dart
 *.pbserver.dart
 *.pbjson.dart
-lib/env.g.dart
+
 lib/core/di/injectable.config.dart
 lib/core/navigation/app_router.gr.dart
 

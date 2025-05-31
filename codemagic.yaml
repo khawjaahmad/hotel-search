@@ -1,90 +1,134 @@
 workflows:
-  hotel-booking-qa:
-    name: Hotel Booking QA Pipeline (MANUAL ONLY)
-    max_build_duration: 60
+  hotel-booking-patrol-qa:
+    name: Hotel Booking Patrol QA
+    max_build_duration: 30
     instance_type: mac_mini_m2
-    
     environment:
       groups:
         - hotel_booking_secrets
       flutter: 3.24.0
       xcode: 15.2
       cocoapods: default
-      
+      vars:
+        PATROL_WAIT: "10000"
+        PATROL_LOG_LEVEL: "info"
     cache:
       cache_paths:
         - $FLUTTER_ROOT/.pub-cache
         - $HOME/.gradle/caches
         - $HOME/Library/Caches/CocoaPods
-        
-    # AUTOMATIC TRIGGERING DISABLED - MANUAL BUILDS ONLY
-    # Remove the # below to re-enable auto builds later
-    # triggering:
-    #   events: []
-    
+        - $HOME/.pub-cache/bin
+    triggering:
+      events: []
     scripts:
-      - name: Setup environment
+      - name: GitHub Context
         script: |
-          echo "🔧 Setting up environment..."
+          echo "GitHub Run ID: ${GITHUB_RUN_ID:-'Not set'}"
+          echo "GitHub SHA: ${GITHUB_SHA:-'Not set'}"
+          echo "Branch: ${CM_BRANCH}"
+          echo "Commit: ${CM_COMMIT}"
+      - name: Environment Setup
+        script: |
           flutter doctor -v
           dart --version
-          
-      - name: Install dependencies
+      - name: Install Dependencies
         script: |
-          echo "📦 Installing dependencies..."
           flutter pub get
-          
       - name: Install Patrol CLI
         script: |
-          echo "🚁 Installing Patrol CLI..."
           dart pub global activate patrol_cli
           export PATH="$PATH:$HOME/.pub-cache/bin"
           patrol --version
-          
-      - name: Generate code
+      - name: Code Generation
         script: |
-          echo "🔨 Generating code..."
           dart run build_runner build --delete-conflicting-outputs
-          
-      - name: Run unit tests
+      - name: Unit Widget Tests Verification
         script: |
-          echo "🧪 Running unit tests..."
-          flutter test test/unit/ --coverage
-          
-      - name: Setup Android emulator for Patrol
+          flutter test test/unit/ --reporter=compact
+      - name: Android Emulator Setup
         script: |
-          echo "🤖 Setting up Android emulator for Patrol..."
-          cd $ANDROID_HOME/tools
-          echo "no" | avdmanager create avd --force -n patrol_test -k "system-images;android-34;google_apis;x86_64"
-          emulator -avd patrol_test -no-audio -no-window &
-          adb wait-for-device shell 'while [[ -z $(getprop sys.boot_completed | tr -d "\r") ]]; do sleep 1; done'
-          
-      - name: Build Android APKs for Patrol
+          AVD_NAME="patrol_codemagic_avd"
+          if ! avdmanager list avd | grep -q "$AVD_NAME"; then
+            echo "no" | avdmanager create avd \
+              --force \
+              -n "$AVD_NAME" \
+              -k "system-images;android-34;google_apis;x86_64" \
+              --device "pixel_7"
+          fi
+          emulator -avd "$AVD_NAME" -no-audio -no-window -gpu swiftshader_indirect &
+          adb wait-for-device shell 'while [[ -z $(getprop sys.boot_completed | tr -d "\r") ]]; do sleep 2; done'
+          adb shell settings put global window_animation_scale 0
+          adb shell settings put global transition_animation_scale 0
+          adb shell settings put global animator_duration_scale 0
+      - name: Build Patrol APKs
         script: |
-          echo "📱 Building APKs for Patrol tests..."
           export PATH="$PATH:$HOME/.pub-cache/bin"
-          patrol build android --target=integration_test/tests/dashboard_test.dart --verbose
-          
-      - name: Run Patrol Tests
+          patrol build android \
+            --target integration_test/ \
+            --verbose \
+            --release
+      - name: Execute Patrol Tests
         script: |
-          echo "🔄 Running Patrol integration tests..."
           export PATH="$PATH:$HOME/.pub-cache/bin"
-          
-          patrol test integration_test/tests/dashboard_test.dart --verbose || true
-          patrol test integration_test/tests/overview_test.dart --verbose || true
-          
+          FAILED_TESTS=()
+          TOTAL_TESTS=0
+          PASSED_TESTS=0
+          TESTS=(
+            "integration_test/tests/dashboard_test.dart"
+            "integration_test/tests/overview_test.dart" 
+            "integration_test/tests/account_test.dart"
+            "integration_test/tests/hotels_test.dart"
+          )
+          for test in "${TESTS[@]}"; do
+            TOTAL_TESTS=$((TOTAL_TESTS + 1))
+            if patrol test "$test" --verbose; then
+              PASSED_TESTS=$((PASSED_TESTS + 1))
+            else
+              FAILED_TESTS+=("$test")
+            fi
+          done
+          echo "Total Tests: $TOTAL_TESTS"
+          echo "Passed: $PASSED_TESTS"
+          echo "Failed: ${#FAILED_TESTS[@]}"
+          if [ ${#FAILED_TESTS[@]} -eq 0 ]; then
+            echo "All Patrol tests passed"
+          else
+            echo "Failed tests:"
+            for failed_test in "${FAILED_TESTS[@]}"; do
+              echo "  - $failed_test"
+            done
+            exit 1
+          fi
         test_report: android_native_test
-        
+      - name: Report Results
+        script: |
+          if [ $? -eq 0 ]; then
+            echo "SUCCESS" > patrol_test_status.txt
+          else
+            echo "FAILURE" > patrol_test_status.txt
+          fi
+          echo "CodeMagic build completed at: $(date)"
+      - name: Cleanup
+        script: |
+          pkill -f emulator || true
+          rm -rf /tmp/patrol* || true
     artifacts:
+      - patrol_test_status.txt
+      - patrol-*.log
+      - screenshots/**
+      - test-results/**
       - build/app/outputs/apk/debug/app-debug.apk
       - build/app/outputs/apk/androidTest/debug/app-debug-androidTest.apk
-      - coverage/**
-      - screenshots/**
-      
     publishing:
-      slack:
-        channel: '#qa-automation'
-        notify_on_build_start: false
-        notify:
-          success: false  # Disabled for manual builds
-          failure: true
+          slack:
+            channel: '#qa-automation'
+            notify_on_build_start: true
+            notify:
+              success: true
+              failure: true
+          email:
+            recipients:
+              - qa-lead@company.com
+            notify:
+              success: false
+              failure: true
