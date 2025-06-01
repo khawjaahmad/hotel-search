@@ -1,7 +1,7 @@
 # =============================================================================
-# HOTEL BOOKING QA AUTOMATION - COMPREHENSIVE MAKEFILE
+# MAKEFILE
 # =============================================================================
-# Full Allure Support for Unit, Widget, and Integration Tests
+# Allure Support for Unit, Widget, and Integration Tests
 # =============================================================================
 
 .PHONY: help setup clean unit widget test-all coverage allure-test \
