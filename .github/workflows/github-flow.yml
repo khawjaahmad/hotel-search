@@ -451,7 +451,7 @@ jobs:
             echo "✅ Unit & Widget Tests: PASSED"
             UNIT_STATUS="PASSED"
           else
-            echo "❌ Unit & Widget Tests: FAILED"
+            echo "Unit & Widget Tests: FAILED"
             UNIT_STATUS="FAILED"
           fi
           
