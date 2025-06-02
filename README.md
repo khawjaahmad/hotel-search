@@ -107,8 +107,8 @@ flutter --version
 #### 2. Project Setup
 ```bash
 # Clone repository
-git clone https://github.com/khawjaahmad/hotel-service.git
-cd hotel-service
+git clone https://github.com/khawjaahmad/hotel-search.git
+cd hotel-search
 
 # Setup project dependencies
 make setup
