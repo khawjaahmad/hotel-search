@@ -11,8 +11,8 @@
 
 ```bash
 # Clone and setup
-git clone https://github.com/your-org/hotel-booking.git
-cd hotel-booking
+git clone https://github.com/khawjaahmad/hotel-search.git
+cd hotel-search
 make setup
 
 # Run all tests
