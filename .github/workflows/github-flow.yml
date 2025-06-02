@@ -58,10 +58,6 @@ jobs:
         with:
           project_id: ${{ secrets.FIREBASE_PROJECT_ID }}
 
-      - name: Enable Firebase Test Lab API
-        run: |
-          gcloud services enable testing.googleapis.com --project=${{ secrets.FIREBASE_PROJECT_ID }}
-
       - name: Build Patrol APKs
         run: |
           echo "▶️ Building APKs for integration_test/tests/dashboard_test.dart..."
