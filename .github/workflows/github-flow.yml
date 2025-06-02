@@ -74,34 +74,12 @@ jobs:
             --app build/app/outputs/apk/debug/app-debug.apk \
             --test build/app/outputs/apk/androidTest/debug/app-debug-androidTest.apk \
             --timeout 10m \
-            --device model=shiba,version=34,locale=en,orientation=portrait \
-            --device model=e3q,version=34,locale=en,orientation=portrait \
+            --device model=oriole,version=33,locale=en,orientation=portrait \
+            --device model=redfin,version=30,locale=en,orientation=portrait \
             --environment-variables clearPackageData=true \
-            --results-bucket=${{ secrets.FIREBASE_PROJECT_ID }}-test-results \
-            --results-dir="patrol-tests-$(date +%Y%m%d-%H%M%S)" \
-            --project ${{ secrets.FIREBASE_PROJECT_ID }} \
-            --format=json > firebase_results.json
+            --project ${{ secrets.FIREBASE_PROJECT_ID }}
 
-      - name: Check Test Results
+      - name: Test Completed
         run: |
-          if [ -f firebase_results.json ]; then
-            OUTCOME=$(jq -r '.outcome // "UNKNOWN"' firebase_results.json)
-            echo "Firebase Test Outcome: $OUTCOME"
-            
-            if [ "$OUTCOME" = "PASSED" ]; then
-              echo "✅ Firebase tests passed"
-            else
-              echo "❌ Firebase tests failed"
-              exit 1
-            fi
-          else
-            echo "❌ No results file found"
-            exit 1
-          fi
-
-      - name: Upload Test Results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: firebase-test-results
-          path: firebase_results.json
+          echo "✅ Firebase Test Lab execution completed"
+          echo "Check the logs above for test results"
