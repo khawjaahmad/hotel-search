@@ -45,7 +45,7 @@ workflows:
           export PATH="$PATH:$HOME/.pub-cache/bin"
           patrol build android \
             --target integration_test/ \
-            --dart-define=SERPAPI_API_KEY="$SERPAPI_API_KEY" \
+            --dart-define="SERPAPI_API_KEY=$SERPAPI_API_KEY" \
             --verbose
       - name: Verify APK Build
         script: |
