@@ -113,6 +113,8 @@ jobs:
           cache: true
 
       - name: Install Dependencies
+        env:
+          SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
         run: |
           flutter pub get
           dart run build_runner build --delete-conflicting-outputs
@@ -185,6 +187,8 @@ jobs:
           echo "$HOME/.pub-cache/bin" >> $GITHUB_PATH
 
       - name: Install Dependencies
+        env:
+          SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
         run: |
           flutter pub get
           dart run build_runner build --delete-conflicting-outputs
@@ -430,8 +434,6 @@ jobs:
               console.log('Error posting comment:', error.message);
             }
 
-
-
   # Final status consolidation
   final_status:
     name: Final Status & Reporting
@@ -502,4 +504,4 @@ jobs:
           else
             echo "💥 Pipeline failed"
             exit 1
-          fi "
+          fi
