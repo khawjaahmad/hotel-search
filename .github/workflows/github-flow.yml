@@ -1,0 +1,85 @@
+name: Build & Test
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+  workflow_dispatch:
+
+env:
+  FLUTTER_VERSION: "3.24.0"
+
+jobs:
+  build_and_test:
+    name: Build & Firebase Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: "stable"
+          cache: true
+
+      - name: Setup Patrol CLI
+        run: |
+          dart pub global activate patrol_cli
+          echo "$HOME/.pub-cache/bin" >> $GITHUB_PATH
+
+      - name: Install Dependencies
+        env:
+          SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
+        run: |
+          flutter pub get
+          dart run build_runner build --delete-conflicting-outputs
+
+      - name: Run Unit & Widget Tests
+        run: |
+          flutter test test/unit/ test/widgets/
+
+      - name: Authenticate Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GOOGLE_CLOUD_SERVICE_ACCOUNT_KEY }}
+
+      - name: Setup Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.FIREBASE_PROJECT_ID }}
+
+      - name: Build Patrol APKs
+        run: |
+          echo "▶️ Building APKs for integration_test/tests/dashboard_test.dart..."
+          patrol build android --target="integration_test/tests/dashboard_test.dart"
+
+      - name: Run Firebase Test Lab
+        env:
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+        run: |
+          echo "🚀 Running tests on Firebase Test Lab..."
+          gcloud firebase test android run \
+            --type instrumentation \
+            --use-orchestrator \
+            --app build/app/outputs/apk/debug/app-debug.apk \
+            --test build/app/outputs/apk/androidTest/debug/app-debug-androidTest.apk \
+            --timeout 10m \
+            --device model=oriole,version=33,locale=en,orientation=portrait \
+            --device model=redfin,version=30,locale=en,orientation=portrait \
+            --environment-variables clearPackageData=true \
+            --project ${{ secrets.FIREBASE_PROJECT_ID }}
+
+      - name: Test Completed
+        run: |
+          echo "✅ Firebase Test Lab execution completed"
+          echo "Check the logs above for test results"
