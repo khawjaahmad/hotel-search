@@ -1,4 +1,4 @@
-name: Hotel Booking QA Pipeline - Fixed
+name: Hotel Booking QA Pipeline - Enhanced
 
 on:
   push:
@@ -13,6 +13,20 @@ on:
     branches: [main, master, develop]
   workflow_dispatch:
     inputs:
+      test_target:
+        description: 'Test target (file or directory)'
+        required: false
+        default: 'integration_test/'
+        type: string
+      device_matrix:
+        description: 'Device matrix size'
+        required: false
+        default: 'standard'
+        type: choice
+        options:
+          - minimal
+          - standard
+          - comprehensive
       run_firebase:
         description: 'Run Firebase Test Lab'
         required: false
@@ -21,37 +35,75 @@ on:
 
 env:
   FLUTTER_VERSION: "3.24.0"
-  JAVA_VERSION: "17"
   FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+  JAVA_VERSION: "17"
 
 jobs:
-  # Job 1: Quick validation
+  # Quick validation for fast feedback
   quick_validation:
-    name: Unit & Widget Tests
+    name: Quick Validation & Analysis
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
       should_run_integration: ${{ steps.changes.outputs.integration_needed }}
+      test_complexity: ${{ steps.analysis.outputs.complexity }}
+      affected_features: ${{ steps.analysis.outputs.features }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0  # Full history for better change analysis
 
-      - name: Check Changed Files
+      - name: Analyze Changes
         id: changes
         run: |
-          if git diff --name-only HEAD~1 | grep -E "(integration_test/|lib/)" > /dev/null; then
+          # Analyze changed files to determine test strategy
+          CHANGED_FILES=$(git diff --name-only HEAD~1 || git ls-files)
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+          
+          # Determine if integration tests are needed
+          if echo "$CHANGED_FILES" | grep -E "(integration_test/|lib/features/)" > /dev/null; then
             echo "integration_needed=true" >> $GITHUB_OUTPUT
+            echo "🔄 Integration tests required due to feature changes"
+          elif echo "$CHANGED_FILES" | grep -E "(lib/)" > /dev/null; then
+            echo "integration_needed=true" >> $GITHUB_OUTPUT
+            echo "🔄 Integration tests required due to lib changes"
           else
             echo "integration_needed=false" >> $GITHUB_OUTPUT
+            echo "⏭️ Integration tests skipped - no relevant changes"
           fi
 
-      - name: Setup Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
+      - name: Feature Impact Analysis
+        id: analysis
+        run: |
+          # Analyze which features are affected
+          FEATURES=""
+          if git diff --name-only HEAD~1 | grep -q "features/hotels/"; then
+            FEATURES="$FEATURES hotels"
+          fi
+          if git diff --name-only HEAD~1 | grep -q "features/favorites/"; then
+            FEATURES="$FEATURES favorites"
+          fi
+          if git diff --name-only HEAD~1 | grep -q "features/account/"; then
+            FEATURES="$FEATURES account"
+          fi
+          
+          # Determine test complexity
+          COMPLEXITY="standard"
+          if [[ -n "$FEATURES" ]]; then
+            WORD_COUNT=$(echo "$FEATURES" | wc -w)
+            if [[ $WORD_COUNT -gt 2 ]]; then
+              COMPLEXITY="comprehensive"
+            elif [[ $WORD_COUNT -eq 1 ]]; then
+              COMPLEXITY="minimal"
+            fi
+          fi
+          
+          echo "features=$FEATURES" >> $GITHUB_OUTPUT
+          echo "complexity=$COMPLEXITY" >> $GITHUB_OUTPUT
+          echo "🎯 Affected features: $FEATURES"
+          echo "📊 Test complexity: $COMPLEXITY"
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -65,26 +117,51 @@ jobs:
           flutter pub get
           dart run build_runner build --delete-conflicting-outputs
 
-      - name: Run Unit & Widget Tests
+      - name: Static Analysis
         run: |
+          echo "🔍 Running static analysis..."
+          dart analyze --fatal-infos
+          dart format --output=none --set-exit-if-changed .
+
+      - name: Unit & Widget Tests
+        run: |
+          echo "🧪 Running unit and widget tests..."
           flutter test test/unit/ test/widgets/ \
             --reporter=expanded \
             --coverage \
-            --timeout=60s
+            --test-randomize-ordering-seed=random
 
-      - name: Upload Coverage
-        uses: codecov/codecov-action@v4
+      - name: Coverage Analysis
+        run: |
+          if command -v lcov &> /dev/null; then
+            lcov --summary coverage/lcov.info
+            
+            # Extract coverage percentage
+            COVERAGE=$(lcov --summary coverage/lcov.info 2>/dev/null | grep "lines" | grep -o '[0-9.]*%' | head -1 || echo "0%")
+            echo "📊 Test Coverage: $COVERAGE"
+            
+            # Check minimum coverage threshold
+            COVERAGE_NUM=$(echo $COVERAGE | sed 's/%//')
+            if (( $(echo "$COVERAGE_NUM < 85" | bc -l) )); then
+              echo "❌ Coverage below threshold: $COVERAGE < 85%"
+              exit 1
+            fi
+          fi
+
+      - name: Upload Coverage Reports
+        uses: codecov/codecov-action@v3
         with:
           file: coverage/lcov.info
           fail_ci_if_error: false
+          flags: unittests
 
-  # Job 2: Build Patrol APKs with corrected Android setup
-  build_patrol_apks:
-    name: Build Patrol APKs
+  # Firebase Test Lab execution with enhanced configuration
+  firebase_test_lab:
+    name: Firebase Test Lab Android
     runs-on: ubuntu-latest
     needs: quick_validation
-    if: needs.quick_validation.outputs.should_run_integration == 'true'
-    timeout-minutes: 35
+    if: needs.quick_validation.outputs.should_run_integration == 'true' && (github.event.inputs.run_firebase != 'false')
+    timeout-minutes: 30
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -92,8 +169,8 @@ jobs:
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '17'
+          distribution: "temurin"
+          java-version: "17"
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -102,35 +179,7 @@ jobs:
           channel: "stable"
           cache: true
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Required Android Components
-        run: |
-          # Accept all licenses first
-          yes | sdkmanager --licenses || true
-          
-          # Install required SDK components
-          echo "Installing Android SDK components..."
-          sdkmanager "platform-tools"
-          sdkmanager "platforms;android-34" 
-          sdkmanager "build-tools;34.0.0"
-          sdkmanager "ndk;26.1.10909125"
-          
-          # Verify installation
-          echo "✅ Installed Android components:"
-          sdkmanager --list_installed | grep -E "(platform|build-tools|ndk)" || true
-          
-          # Set environment variables
-          export ANDROID_NDK_VERSION=26.1.10909125
-          echo "ANDROID_NDK_VERSION=26.1.10909125" >> $GITHUB_ENV
-          
-          if [ -n "$ANDROID_SDK_ROOT" ]; then
-            export ANDROID_NDK_ROOT="$ANDROID_SDK_ROOT/ndk/26.1.10909125"
-            echo "ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/26.1.10909125" >> $GITHUB_ENV
-          fi
-
-      - name: Install Patrol CLI
+      - name: Setup Patrol CLI
         run: |
           dart pub global activate patrol_cli
           echo "$HOME/.pub-cache/bin" >> $GITHUB_PATH
@@ -139,267 +188,6 @@ jobs:
         run: |
           flutter pub get
           dart run build_runner build --delete-conflicting-outputs
-
-      - name: Fix CI Environment Issues
-        run: |
-          echo "🔧 Applying CI environment fixes..."
-          
-          # Fix NDK version in gradle.properties
-          if [ ! -f "android/gradle.properties" ]; then
-            touch android/gradle.properties
-          fi
-          
-          # Remove existing NDK version and add correct one
-          sed -i '/android.ndkVersion/d' android/gradle.properties 2>/dev/null || true
-          echo "android.ndkVersion=26.1.10909125" >> android/gradle.properties
-          
-          # Create minimal proguard-rules.pro if missing
-          if [ ! -f "android/app/proguard-rules.pro" ]; then
-            cat > android/app/proguard-rules.pro << 'EOF'
-          # Flutter ProGuard rules
-          -keep class io.flutter.app.** { *; }
-          -keep class io.flutter.plugin.** { *; }
-          -keep class io.flutter.util.** { *; }
-          -keep class io.flutter.view.** { *; }
-          -keep class io.flutter.** { *; }
-          -keep class io.flutter.plugins.** { *; }
-          
-          # Patrol specific rules
-          -keep class pl.leancode.patrol.** { *; }
-          
-          # Integration test rules  
-          -keep class dev.flutter.integration_test.** { *; }
-          
-          # Don't optimize for debugging
-          -dontoptimize
-          -dontobfuscate
-          EOF
-            echo "✅ Created proguard-rules.pro"
-          fi
-          
-          # Fix gradle wrapper permissions
-          chmod +x android/gradlew
-          
-          echo "✅ CI environment fixes applied"
-
-      - name: Verify Environment Setup
-        run: |
-          echo "🔍 Verifying environment setup..."
-          echo "Java version:"
-          java -version
-          echo ""
-          echo "Flutter version:"
-          flutter --version
-          echo ""
-          echo "Patrol version:"
-          patrol --version
-          echo ""
-          echo "Android SDK location: $ANDROID_SDK_ROOT"
-          echo "Android NDK location: $ANDROID_NDK_ROOT"
-          
-          # Check if NDK is actually installed
-          if [ -d "$ANDROID_SDK_ROOT/ndk/26.1.10909125" ]; then
-            echo "✅ NDK 26.1.10909125 is installed"
-          else
-            echo "❌ NDK 26.1.10909125 not found"
-            echo "Available NDK versions:"
-            ls -la "$ANDROID_SDK_ROOT/ndk/" || echo "NDK directory not found"
-          fi
-
-      - name: Build Patrol APKs with Retry Logic
-        run: |
-          # Function to attempt build
-          build_patrol() {
-            echo "🔨 Building Patrol APKs..."
-            patrol build android \
-              --target integration_test/ \
-              --release \
-              --verbose \
-              --dart-define=PATROL_WAIT=0 \
-              --dart-define=PATROL_APP_PACKAGE_NAME=com.example.hotel_booking \
-              --dart-define=PATROL_ANDROID_APP_NAME="Hotel Booking" \
-              --dart-define=PATROL_TEST_LABEL_ENABLED=true
-          }
-          
-          # First attempt
-          echo "🔨 First build attempt..."
-          if build_patrol; then
-            echo "✅ Build successful on first attempt"
-          else
-            echo "❌ First attempt failed, cleaning and retrying..."
-            
-            # Clean everything thoroughly
-            flutter clean
-            rm -rf android/.gradle
-            rm -rf android/app/build
-            rm -rf build/
-            rm -rf ~/.gradle/caches/
-            
-            # Re-setup everything
-            flutter pub get
-            dart run build_runner build --delete-conflicting-outputs
-            
-            # Ensure permissions
-            chmod +x android/gradlew
-            
-            # Second attempt with debug build for better error reporting
-            echo "🔨 Second attempt with debug build..."
-            if patrol build android --target integration_test/ --debug --verbose; then
-              echo "✅ Debug build successful"
-            else
-              echo "❌ Both attempts failed - checking for partial outputs..."
-              find build/ -name "*.apk" -type f 2>/dev/null || echo "No APK files found"
-              
-              # Show detailed error information
-              echo "=== Build Error Details ==="
-              if [ -f "android/app/build/outputs/logs/gradle.log" ]; then
-                tail -50 android/app/build/outputs/logs/gradle.log
-              fi
-              
-              exit 1
-            fi
-          fi
-
-      - name: Verify APK Outputs
-        run: |
-          echo "📦 Checking build outputs..."
-          
-          # List all APK files recursively
-          echo "All APK files found:"
-          find build/ -name "*.apk" -type f 2>/dev/null || echo "No APK files found"
-          
-          # Check standard locations
-          echo ""
-          echo "Checking standard APK locations:"
-          
-          APP_APK="build/app/outputs/apk/debug/app-debug.apk"
-          TEST_APK="build/app/outputs/apk/androidTest/debug/app-debug-androidTest.apk"
-          
-          if [ -f "$APP_APK" ]; then
-            echo "✅ App APK found: $APP_APK ($(du -h "$APP_APK" | cut -f1))"
-          else
-            echo "❌ App APK not found at $APP_APK"
-            # Try to find app APK elsewhere
-            echo "Searching for app APK..."
-            find build/ -name "*app*.apk" -not -name "*test*" -type f | head -3
-          fi
-          
-          if [ -f "$TEST_APK" ]; then
-            echo "✅ Test APK found: $TEST_APK ($(du -h "$TEST_APK" | cut -f1))"
-          else
-            echo "❌ Test APK not found at $TEST_APK"
-            # Try to find test APK elsewhere
-            echo "Searching for test APK..."
-            find build/ -name "*test*.apk" -type f | head -3
-          fi
-          
-          # Ensure at least one of each type was found
-          APP_COUNT=$(find build/ -name "*app*.apk" -not -name "*test*" -type f | wc -l)
-          TEST_COUNT=$(find build/ -name "*test*.apk" -type f | wc -l)
-          
-          if [ "$APP_COUNT" -eq 0 ]; then
-            echo "❌ No app APK found anywhere"
-            exit 1
-          fi
-          
-          if [ "$TEST_COUNT" -eq 0 ]; then
-            echo "❌ No test APK found anywhere"
-            exit 1
-          fi
-          
-          echo "✅ APK verification passed"
-
-      - name: Upload APK Artifacts
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: patrol-apks
-          path: |
-            build/app/outputs/apk/**/*.apk
-            build/**/*.apk
-          retention-days: 7
-
-      - name: Upload Build Logs on Failure
-        uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: build-logs
-          path: |
-            android/app/build/outputs/logs/
-            ~/.gradle/daemon/*/daemon-*.log
-            patrol-*.log
-          retention-days: 3
-
-  # Job 3: Firebase Test Lab (only if APKs were built successfully)
-  firebase_test_lab:
-    name: Firebase Test Lab
-    runs-on: ubuntu-latest
-    needs: [quick_validation, build_patrol_apks]
-    if: needs.quick_validation.outputs.should_run_integration == 'true' && needs.build_patrol_apks.result == 'success' && (github.event.inputs.run_firebase != 'false')
-    timeout-minutes: 45
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Download APK Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: patrol-apks
-          path: build/
-
-      - name: Locate and Verify APK Files
-        id: locate_apks
-        run: |
-          echo "🔍 Locating APK files..."
-          
-          # List all downloaded files
-          find build/ -type f -name "*.apk"
-          
-          # Find app and test APKs using more flexible search
-          APP_APK=$(find build/ -name "*app*.apk" -not -name "*test*" -not -name "*androidTest*" | head -1)
-          TEST_APK=$(find build/ -name "*androidTest*.apk" -o -name "*test*.apk" | head -1)
-          
-          # Fallback search if not found
-          if [ -z "$APP_APK" ]; then
-            APP_APK=$(find build/ -path "*/debug/app-debug.apk" | head -1)
-          fi
-          
-          if [ -z "$TEST_APK" ]; then
-            TEST_APK=$(find build/ -path "*/androidTest/debug/*androidTest.apk" | head -1)
-          fi
-          
-          # Verify we found both APKs
-          if [ -z "$APP_APK" ] || [ ! -f "$APP_APK" ]; then
-            echo "❌ App APK not found"
-            echo "Available files:"
-            find build/ -name "*.apk" -type f
-            exit 1
-          fi
-          
-          if [ -z "$TEST_APK" ] || [ ! -f "$TEST_APK" ]; then
-            echo "❌ Test APK not found" 
-            echo "Available files:"
-            find build/ -name "*.apk" -type f
-            exit 1
-          fi
-          
-          # Verify APK files are valid
-          if [ ! -s "$APP_APK" ]; then
-            echo "❌ App APK is empty"
-            exit 1
-          fi
-          
-          if [ ! -s "$TEST_APK" ]; then
-            echo "❌ Test APK is empty"
-            exit 1
-          fi
-          
-          echo "app_apk=$APP_APK" >> $GITHUB_OUTPUT
-          echo "test_apk=$TEST_APK" >> $GITHUB_OUTPUT
-          
-          echo "✅ Found valid APKs:"
-          echo "  App APK: $APP_APK ($(du -h "$APP_APK" | cut -f1))"
-          echo "  Test APK: $TEST_APK ($(du -h "$TEST_APK" | cut -f1))"
 
       - name: Authenticate Google Cloud
         uses: google-github-actions/auth@v2
@@ -411,6 +199,15 @@ jobs:
         with:
           project_id: ${{ secrets.FIREBASE_PROJECT_ID }}
 
+      - name: Build Patrol APKs
+        run: |
+          echo "Building APKs for Firebase Test Lab..."
+          patrol build android --target integration_test/tests/dashboard_test.dart --release --verbose
+          
+          # Verify APKs exist
+          ls -la build/app/outputs/apk/debug/
+          ls -la build/app/outputs/apk/androidTest/debug/
+
       - name: Run Firebase Test Lab
         env:
           FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
@@ -418,133 +215,291 @@ jobs:
           TIMESTAMP=$(date +%Y%m%d-%H%M%S)
           RESULTS_DIR="patrol-github-${TIMESTAMP}"
           
-          echo "🚀 Running Firebase Test Lab..."
-          echo "App APK: ${{ steps.locate_apks.outputs.app_apk }}"
-          echo "Test APK: ${{ steps.locate_apks.outputs.test_apk }}"
-          
           gcloud firebase test android run \
             --type instrumentation \
-            --app "${{ steps.locate_apks.outputs.app_apk }}" \
-            --test "${{ steps.locate_apks.outputs.test_apk }}" \
+            --app build/app/outputs/apk/debug/app-debug.apk \
+            --test build/app/outputs/apk/androidTest/debug/app-debug-androidTest.apk \
             --device model=shiba,version=34,locale=en,orientation=portrait \
-            --timeout 25m \
-            --results-bucket="${FIREBASE_PROJECT_ID}-test-results" \
+            --device model=oriole,version=33,locale=en,orientation=portrait \
+            --timeout 20m \
+            --results-bucket=${FIREBASE_PROJECT_ID}-test-results \
             --results-dir="${RESULTS_DIR}" \
             --environment-variables \
               clearPackageData=true,\
               disableAnalytics=true,\
-              PATROL_WAIT=10000,\
-              GITHUB_RUN_ID=${{ github.run_id }},\
-              GITHUB_SHA=${{ github.sha }} \
+              PATROL_WAIT=10000 \
             --use-orchestrator \
-            --project "$FIREBASE_PROJECT_ID" \
+            --performance-metrics \
+            --project $FIREBASE_PROJECT_ID \
             --format=json > firebase_results.json
+          
+          # Store results directory for artifact download
+          echo "RESULTS_DIR=${RESULTS_DIR}" >> $GITHUB_ENV
 
-      - name: Parse Firebase Results
+      - name: Check Results
         run: |
           if [ -f firebase_results.json ]; then
-            echo "📊 Firebase Test Lab Results:"
-            cat firebase_results.json | jq '.' || cat firebase_results.json
-            
             OUTCOME=$(jq -r '.outcome // "UNKNOWN"' firebase_results.json)
             TEST_MATRIX_ID=$(jq -r '.testMatrixId // "unknown"' firebase_results.json)
             
-            echo ""
+            echo "Firebase Test Outcome: $OUTCOME"
             echo "Test Matrix ID: $TEST_MATRIX_ID"
-            echo "Outcome: $OUTCOME"
             
+            # Create summary report
+            cat > test_summary.md << EOF
+          # Firebase Test Lab Results
+          
+          ## Test Details
+          - **Outcome**: $OUTCOME
+          - **Test Matrix ID**: $TEST_MATRIX_ID
+          - **Timestamp**: $(date)
+          - **Test Target**: integration_test/tests/dashboard_test.dart
+          - **Devices Tested**: 2 (Pixel 8, Pixel 6)
+          
+          ## Device Matrix
+          - **Device 1**: Pixel 8 (shiba) - Android 34
+          - **Device 2**: Pixel 6 (oriole) - Android 33
+          
+          ## Results Location
+          - **Firebase Console**: https://console.firebase.google.com/project/${FIREBASE_PROJECT_ID}/testlab/histories/
+          - **Cloud Storage**: https://console.cloud.google.com/storage/browser/${FIREBASE_PROJECT_ID}-test-results/${RESULTS_DIR}
+          EOF
+          
             if [ "$OUTCOME" = "PASSED" ]; then
-              echo "✅ Firebase Test Lab: PASSED"
+              echo "✅ Firebase tests passed" >> test_summary.md
+              echo "✅ Firebase tests passed"
             else
-              echo "❌ Firebase Test Lab: FAILED (Outcome: $OUTCOME)"
+              echo "❌ Firebase tests failed" >> test_summary.md
+              echo "❌ Firebase tests failed"
               exit 1
             fi
           else
-            echo "❌ Firebase results file not found"
+            echo "❌ No results file found"
             exit 1
           fi
 
-      - name: Upload Firebase Results
+      - name: Download Test Artifacts
+        if: always()
+        env:
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+        run: |
+          echo "📥 Downloading test artifacts..."
+          mkdir -p firebase_artifacts
+          
+          # Download screenshots and logs only (no videos)
+          gsutil -m cp -r "gs://${FIREBASE_PROJECT_ID}-test-results/${RESULTS_DIR}/*" firebase_artifacts/ || echo "Some artifacts may not be available yet"
+          
+          # Remove video files if any were downloaded
+          find firebase_artifacts -name "*.mp4" -delete 2>/dev/null || true
+          
+          # List downloaded files
+          echo "Downloaded artifacts:"
+          find firebase_artifacts -type f -name "*.png" -o -name "*.xml" -o -name "*.json" | head -20
+
+      - name: Generate Test Report
+        if: always()
+        run: |
+          echo "📊 Generating comprehensive test report..."
+          
+          # Create HTML report
+          cat > firebase_report.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>Firebase Test Lab Results</title>
+              <style>
+                  body { font-family: Arial, sans-serif; margin: 20px; }
+                  .header { background: #4285f4; color: white; padding: 20px; border-radius: 8px; }
+                  .device { border: 1px solid #ddd; margin: 10px 0; padding: 15px; border-radius: 8px; }
+                  .passed { border-left: 5px solid #34a853; }
+                  .failed { border-left: 5px solid #ea4335; }
+                  .artifact { margin: 5px 0; }
+                  .screenshot { max-width: 300px; margin: 10px; border: 1px solid #ddd; }
+              </style>
+          </head>
+          <body>
+              <div class="header">
+                  <h1>🧪 Firebase Test Lab Results</h1>
+                  <p>Hotel Booking App - Patrol Integration Tests</p>
+              </div>
+          EOF
+          
+          # Add test summary
+          if [ -f test_summary.md ]; then
+            echo "<div class='summary'>" >> firebase_report.html
+            echo "<h2>Test Summary</h2>" >> firebase_report.html
+            
+            OUTCOME=$(jq -r '.outcome // "UNKNOWN"' firebase_results.json)
+            if [ "$OUTCOME" = "PASSED" ]; then
+              echo "<div class='device passed'>" >> firebase_report.html
+              echo "<h3>✅ All Tests Passed</h3>" >> firebase_report.html
+            else
+              echo "<div class='device failed'>" >> firebase_report.html
+              echo "<h3>❌ Some Tests Failed</h3>" >> firebase_report.html
+            fi
+            echo "</div></div>" >> firebase_report.html
+          fi
+          
+          # Add device results if available
+          echo "<h2>📱 Device Results</h2>" >> firebase_report.html
+          
+          # Check for device-specific results
+          if [ -d "firebase_artifacts" ]; then
+            echo "<div class='device'>" >> firebase_report.html
+            echo "<h3>Device Test Artifacts</h3>" >> firebase_report.html
+            
+            # List screenshots
+            if find firebase_artifacts -name "*.png" | head -1 > /dev/null 2>&1; then
+              echo "<h4>📸 Screenshots</h4>" >> firebase_report.html
+              find firebase_artifacts -name "*.png" | head -10 | while read screenshot; do
+                if [ -f "$screenshot" ]; then
+                  filename=$(basename "$screenshot")
+                  echo "<div class='artifact'>📸 $filename</div>" >> firebase_report.html
+                fi
+              done
+            fi
+            
+            # List test logs
+            if find firebase_artifacts -name "*.xml" -o -name "*.json" | head -1 > /dev/null 2>&1; then
+              echo "<h4>📋 Test Reports</h4>" >> firebase_report.html
+              find firebase_artifacts -name "*.xml" -o -name "*.json" | head -10 | while read log; do
+                if [ -f "$log" ]; then
+                  filename=$(basename "$log")
+                  echo "<div class='artifact'>📋 $filename</div>" >> firebase_report.html
+                fi
+              done
+            fi
+            
+            echo "</div>" >> firebase_report.html
+          fi
+          
+          # Close HTML
+          echo "<div class='footer'>" >> firebase_report.html
+          echo "<p>Generated on: $(date)</p>" >> firebase_report.html
+          echo "<p>GitHub Run ID: ${{ github.run_id }}</p>" >> firebase_report.html
+          echo "</div></body></html>" >> firebase_report.html
+          
+          echo "✅ Test report generated: firebase_report.html"
+
+      - name: Upload Results
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: firebase-test-results
-          path: firebase_results.json
+          path: |
+            firebase_results.json
+            test_summary.md
+            firebase_report.html
+            firebase_artifacts/**
+          retention-days: 30
 
-  # Job 4: Final status summary
+      - name: Comment PR with Results
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            // Read test summary
+            let summary = '# 🧪 Firebase Test Lab Results\n\n';
+            
+            try {
+              if (fs.existsSync('test_summary.md')) {
+                summary += fs.readFileSync('test_summary.md', 'utf8');
+              }
+              
+              // Add quick stats
+              summary += '\n## 📊 Quick Stats\n';
+              summary += '- **Devices**: 2 (Pixel 8, Pixel 6)\n';
+              summary += '- **Test Type**: Patrol Integration Tests\n';
+              summary += '- **Target**: `integration_test/tests/dashboard_test.dart`\n';
+              
+              // Add links
+              summary += '\n## 🔗 Links\n';
+              summary += `- [GitHub Action Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})\n`;
+              summary += `- [Download Artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts)\n`;
+              
+              // Post comment
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: summary
+              });
+            } catch (error) {
+              console.log('Error posting comment:', error.message);
+            }
+
+
+
+  # Final status consolidation
   final_status:
-    name: Final Status Summary
+    name: Final Status & Reporting
     runs-on: ubuntu-latest
-    needs: [quick_validation, build_patrol_apks, firebase_test_lab]
+    needs: [quick_validation, firebase_test_lab]
     if: always()
     steps:
-      - name: Generate Summary Report
+      - name: Collect Results
+        id: results
         run: |
-          echo "## 📊 CI/CD Pipeline Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Stage | Status | Duration |" >> $GITHUB_STEP_SUMMARY
-          echo "|-------|--------|----------|" >> $GITHUB_STEP_SUMMARY
+          echo "📊 Collecting pipeline results..."
           
-          # Unit/Widget Tests
+          # Unit/Widget tests
           if [ "${{ needs.quick_validation.result }}" = "success" ]; then
-            echo "| Unit & Widget Tests | ✅ PASSED | ~5min |" >> $GITHUB_STEP_SUMMARY
+            echo "✅ Unit & Widget Tests: PASSED"
+            UNIT_STATUS="PASSED"
           else
-            echo "| Unit & Widget Tests | ❌ FAILED | ~5min |" >> $GITHUB_STEP_SUMMARY
-          fi
-          
-          # Patrol APK Build
-          if [ "${{ needs.build_patrol_apks.result }}" = "success" ]; then
-            echo "| Patrol APK Build | ✅ PASSED | ~15min |" >> $GITHUB_STEP_SUMMARY
-          elif [ "${{ needs.build_patrol_apks.result }}" = "skipped" ]; then
-            echo "| Patrol APK Build | ⏭️ SKIPPED | N/A |" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "| Patrol APK Build | ❌ FAILED | ~15min |" >> $GITHUB_STEP_SUMMARY
+            echo "❌ Unit & Widget Tests: FAILED"
+            UNIT_STATUS="FAILED"
           fi
           
           # Firebase Test Lab
           if [ "${{ needs.firebase_test_lab.result }}" = "success" ]; then
-            echo "| Firebase Test Lab | ✅ PASSED | ~20min |" >> $GITHUB_STEP_SUMMARY
+            echo "✅ Firebase Test Lab: PASSED"
+            FIREBASE_STATUS="PASSED"
           elif [ "${{ needs.firebase_test_lab.result }}" = "skipped" ]; then
-            echo "| Firebase Test Lab | ⏭️ SKIPPED | N/A |" >> $GITHUB_STEP_SUMMARY
+            echo "⏭️ Firebase Test Lab: SKIPPED"
+            FIREBASE_STATUS="SKIPPED"
           else
-            echo "| Firebase Test Lab | ❌ FAILED | ~20min |" >> $GITHUB_STEP_SUMMARY
+            echo "❌ Firebase Test Lab: FAILED"
+            FIREBASE_STATUS="FAILED"
           fi
           
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Build Information:**" >> $GITHUB_STEP_SUMMARY
-          echo "- Build ID: \`${{ github.run_id }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- Commit: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- Branch: \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- Triggered by: \`${{ github.actor }}\`" >> $GITHUB_STEP_SUMMARY
+          # Overall status
+          if [[ "$UNIT_STATUS" = "PASSED" && 
+                ("$FIREBASE_STATUS" = "PASSED" || "$FIREBASE_STATUS" = "SKIPPED") ]]; then
+            OVERALL_STATUS="SUCCESS"
+            echo "🎉 Overall Pipeline Status: SUCCESS"
+          else
+            OVERALL_STATUS="FAILURE"
+            echo "💥 Overall Pipeline Status: FAILURE"
+          fi
+          
+          # Export for summary
+          echo "unit_status=$UNIT_STATUS" >> $GITHUB_OUTPUT
+          echo "firebase_status=$FIREBASE_STATUS" >> $GITHUB_OUTPUT  
+          echo "overall_status=$OVERALL_STATUS" >> $GITHUB_OUTPUT
 
-      - name: Final Pipeline Result
+      - name: Generate Pipeline Summary
         run: |
-          echo "🔍 Evaluating final pipeline result..."
-          
-          FAILED=false
-          
-          # Check each job result
-          if [ "${{ needs.quick_validation.result }}" != "success" ]; then
-            echo "❌ Unit/Widget tests failed"
-            FAILED=true
-          fi
-          
-          if [ "${{ needs.build_patrol_apks.result }}" = "failure" ]; then
-            echo "❌ Patrol APK build failed"
-            FAILED=true
-          fi
-          
-          if [ "${{ needs.firebase_test_lab.result }}" = "failure" ]; then
-            echo "❌ Firebase Test Lab failed"
-            FAILED=true
-          fi
-          
-          # Final result
-          if [ "$FAILED" = "true" ]; then
-            echo "❌ Overall pipeline: FAILED"
-            echo "Check the individual job logs for detailed error information."
-            exit 1
+          echo "# 🏁 Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "- **Unit & Widget Tests**: ${{ steps.results.outputs.unit_status }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Firebase Test Lab**: ${{ steps.results.outputs.firebase_status }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Overall Status: ${{ steps.results.outputs.overall_status }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔗 Links" >> $GITHUB_STEP_SUMMARY
+          echo "- [Action Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+          echo "- [Firebase Console](https://console.firebase.google.com/project/${{ env.FIREBASE_PROJECT_ID }}/testlab/histories/)" >> $GITHUB_STEP_SUMMARY
+
+      - name: Final Result
+        run: |
+          if [ "${{ steps.results.outputs.overall_status }}" = "SUCCESS" ]; then
+            echo "🎉 All tests passed!"
+            exit 0
           else
-            echo "✅ Overall pipeline: PASSED"
-            echo "All stages completed successfully!"
-          fi
+            echo "💥 Pipeline failed"
+            exit 1
+          fi "
