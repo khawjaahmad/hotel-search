@@ -44,6 +44,8 @@ jobs:
     name: Quick Validation & Analysis
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
     outputs:
       should_run_integration: ${{ steps.changes.outputs.integration_needed }}
       test_complexity: ${{ steps.analysis.outputs.complexity }}
@@ -113,8 +115,6 @@ jobs:
           cache: true
 
       - name: Install Dependencies
-        env:
-          SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
         run: |
           flutter pub get
           dart run build_runner build --delete-conflicting-outputs
@@ -164,6 +164,8 @@ jobs:
     needs: quick_validation
     if: needs.quick_validation.outputs.should_run_integration == 'true' && (github.event.inputs.run_firebase != 'false')
     timeout-minutes: 30
+    env:
+      SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -187,8 +189,6 @@ jobs:
           echo "$HOME/.pub-cache/bin" >> $GITHUB_PATH
 
       - name: Install Dependencies
-        env:
-          SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
         run: |
           flutter pub get
           dart run build_runner build --delete-conflicting-outputs
@@ -451,7 +451,7 @@ jobs:
             echo "✅ Unit & Widget Tests: PASSED"
             UNIT_STATUS="PASSED"
           else
-            echo "Unit & Widget Tests: FAILED"
+            echo "❌ Unit & Widget Tests: FAILED"
             UNIT_STATUS="FAILED"
           fi
           
