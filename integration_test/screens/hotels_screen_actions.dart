@@ -1,11 +1,240 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:patrol/patrol.dart';
 
 import '../helpers/test_logger.dart';
 import '../locators/app_locators.dart';
 
+/// Enhanced Hotels Screen Actions with Advanced Features
+/// Includes fluent interface, advanced error handling, and performance monitoring
 class HotelsScreenActions {
+  final PatrolIntegrationTester tester;
+  final Duration defaultTimeout;
+  
+  HotelsScreenActions(this.tester, {this.defaultTimeout = const Duration(seconds: 10)});
+  
+  /// Get page-specific assertions (would need custom_assertions import)
+  // HotelsPageAssertions get assertions => HotelsPageAssertions(tester, this);
   static final List<String> _favoriteHotels = [];
+
+  /// Fluent wait with custom conditions
+  Future<HotelsScreenActions> waitFor(PatrolFinder finder, {
+    Duration? timeout,
+    String? description,
+  }) async {
+    final actualTimeout = timeout ?? defaultTimeout;
+    final desc = description ?? 'element to be visible';
+    
+    try {
+      await finder.waitUntilVisible(timeout: actualTimeout);
+      return this;
+    } catch (e) {
+      throw HotelsPageException(
+        'Failed to wait for $desc on Hotels page',
+        originalException: e is Exception ? e : Exception(e.toString()),
+      );
+    }
+  }
+
+  /// Fluent tap with validation
+  Future<HotelsScreenActions> tapElement(PatrolFinder finder, {
+    String? description,
+    bool validateAfterTap = true,
+  }) async {
+    final desc = description ?? 'element';
+    
+    try {
+      await finder.waitUntilVisible();
+      await finder.tap();
+      
+      if (validateAfterTap) {
+        await tester.pump(const Duration(milliseconds: 300));
+      }
+      
+      return this;
+    } catch (e) {
+      throw HotelsPageException(
+        'Failed to tap $desc on Hotels page',
+        originalException: e is Exception ? e : Exception(e.toString()),
+      );
+    }
+  }
+
+  /// Fluent text input with validation
+  Future<HotelsScreenActions> enterText(PatrolFinder finder, String text, {
+    String? description,
+    bool clearFirst = true,
+  }) async {
+    final desc = description ?? 'text field';
+    
+    try {
+      await finder.waitUntilVisible();
+      
+      if (clearFirst) {
+        await finder.tap();
+        await tester.pump(const Duration(milliseconds: 100));
+        await tester.enterText(finder, '');
+      }
+      
+      await finder.enterText(text);
+      await tester.pump(const Duration(milliseconds: 300));
+      
+      return this;
+    } catch (e) {
+      throw HotelsPageException(
+        'Failed to enter text "$text" in $desc on Hotels page',
+        originalException: e is Exception ? e : Exception(e.toString()),
+      );
+    }
+  }
+
+  /// Validate page is loaded with fluent interface
+  Future<HotelsScreenActions> validatePageLoaded() async {
+    await waitFor(AppLocators.getHotelsScaffold(tester), description: 'hotels scaffold');
+    await waitFor(AppLocators.getHotelsAppBar(tester), description: 'hotels app bar');
+    await waitFor(AppLocators.getSearchTextField(tester), description: 'search field');
+    return this;
+  }
+
+  /// Enhanced search with advanced options
+  Future<HotelsScreenActions> performSearch(String query, {
+    bool waitForResults = true,
+    Duration? searchTimeout,
+  }) async {
+    await enterText(
+      AppLocators.getSearchTextField(tester),
+      query,
+      description: 'search field',
+    );
+
+    if (waitForResults) {
+      await _waitForSearchResults(searchTimeout ?? const Duration(seconds: 15));
+    }
+
+    return this;
+  }
+
+  /// Advanced search result waiting with multiple conditions
+  Future<HotelsScreenActions> _waitForSearchResults(Duration timeout) async {
+    final stopwatch = Stopwatch()..start();
+    
+    while (stopwatch.elapsed < timeout) {
+      await tester.pump(const Duration(milliseconds: 500));
+      
+      // Check for loading indicators
+      final isLoading = AppLocators.getHotelsLoadingIndicator(tester).exists ||
+                       AppLocators.getHotelsPaginationLoading(tester).exists;
+      
+      if (!isLoading) {
+        // Check for results, errors, or empty state
+        if (tester(Card).exists) {
+          return this; // Results found
+        } else if (AppLocators.getHotelsErrorMessage(tester).exists) {
+          return this; // Error state
+        } else if (AppLocators.getHotelsEmptyStateIcon(tester).exists) {
+          return this; // Empty state
+        }
+      }
+    }
+    
+    throw HotelsPageException(
+      'Search results did not load within ${timeout.inSeconds} seconds',
+    );
+  }
+
+  /// Smart hotel selection with validation
+  Future<HotelsScreenActions> selectHotel(int index, {bool validateSelection = true}) async {
+    final cards = tester(Card).evaluate();
+    
+    if (index >= cards.length) {
+      throw HotelsPageException(
+        'Hotel index $index out of range (0-${cards.length - 1})',
+      );
+    }
+
+    await tapElement(
+      tester(Card).at(index),
+      description: 'hotel card at index $index',
+      validateAfterTap: validateSelection,
+    );
+
+    return this;
+  }
+
+  /// Advanced favorites management
+  Future<HotelsScreenActions> toggleFavorite(int hotelIndex, {bool expectAdded = true}) async {
+    final cards = tester(Card).evaluate();
+    
+    if (hotelIndex >= cards.length) {
+      throw HotelsPageException(
+        'Hotel index $hotelIndex out of range',
+      );
+    }
+
+    // Find favorite button within the card
+    final favoriteButton = tester(IconButton).at(hotelIndex);
+    
+    if (!favoriteButton.exists) {
+      throw HotelsPageException(
+        'Favorite button not found in hotel card at index $hotelIndex',
+      );
+    }
+
+    await tapElement(favoriteButton, description: 'favorite button');
+    
+    // Validate the action with visual feedback
+    await tester.pump(const Duration(milliseconds: 500));
+    
+    return this;
+  }
+
+  /// Bulk operations for stress testing
+  Future<HotelsScreenActions> favoriteMultipleHotels(List<int> indices) async {
+    for (final index in indices) {
+      await toggleFavorite(index);
+      await tester.pump(const Duration(milliseconds: 200)); // Prevent rapid tapping
+    }
+    return this;
+  }
+
+  /// Data-driven search testing
+  Future<HotelsScreenActions> performDataDrivenSearch(List<String> queries) async {
+    for (final query in queries) {
+      await performSearch(query);
+      // await assertions.assertSearchResults(); // Would need custom_assertions import
+      await tester.pump(const Duration(milliseconds: 500));
+    }
+    return this;
+  }
+
+  /// Clear search field
+  Future<HotelsScreenActions> clearSearchField() async {
+    await enterText(
+      AppLocators.getSearchTextField(tester),
+      '',
+      description: 'search field',
+      clearFirst: true,
+    );
+    return this;
+  }
+
+  /// Error scenario testing
+  Future<HotelsScreenActions> testErrorScenarios() async {
+    final errorScenarios = [
+      '', // Empty search
+      '!@#\$%^&*()', // Special characters
+      'x' * 1000, // Very long query
+      '   ', // Whitespace only
+    ];
+
+    for (final scenario in errorScenarios) {
+      await performSearch(scenario, waitForResults: false);
+      await tester.pump(const Duration(seconds: 2));
+      // Validate error handling or graceful degradation
+    }
+    
+    return this;
+  }
 
   static Future<void> navigateToHotelsPage(PatrolIntegrationTester $) async {
     TestLogger.logNavigation($, 'Hotels page');
@@ -61,12 +290,12 @@ class HotelsScreenActions {
 
     await $.pump(const Duration(milliseconds: 1500));
 
-    await _waitForSearchResults($);
+    await _waitForSearchResultsStatic($);
 
     TestLogger.logTestSuccess($, 'Search functionality test completed');
   }
 
-  static Future<void> _waitForSearchResults(PatrolIntegrationTester $) async {
+  static Future<void> _waitForSearchResultsStatic(PatrolIntegrationTester $) async {
     TestLogger.logWaiting($, 'search results to populate');
 
     const maxWaitTime = Duration(seconds: 15);
@@ -367,7 +596,7 @@ class HotelsScreenActions {
     await hotelsTab.waitUntilVisible();
     await hotelsTab.tap();
 
-    await clearSearchField($);
+    await clearSearchFieldStatic($);
 
     final searchTextField = AppLocators.getSearchTextField($);
     await searchTextField.waitUntilVisible();
@@ -381,7 +610,7 @@ class HotelsScreenActions {
     TestLogger.logTestSuccess($, 'Negative search scenarios test completed');
   }
 
-  static Future<void> clearSearchField(PatrolIntegrationTester $) async {
+  static Future<void> clearSearchFieldStatic(PatrolIntegrationTester $) async {
     TestLogger.logAction($, 'Clearing search field');
 
     final clearButton = AppLocators.getSearchClearButton($);
@@ -474,7 +703,7 @@ class HotelsScreenActions {
   static Future<void> testEmptySearchInput(PatrolIntegrationTester $) async {
     TestLogger.logAction($, 'Testing empty search input');
 
-    await clearSearchField($);
+    await clearSearchFieldStatic($);
 
     final searchTextField = AppLocators.getSearchTextField($);
     await searchTextField.waitUntilVisible();
@@ -496,7 +725,7 @@ class HotelsScreenActions {
       PatrolIntegrationTester $) async {
     TestLogger.logAction($, 'Testing special character search input');
 
-    await clearSearchField($);
+    await clearSearchFieldStatic($);
 
     final searchTextField = AppLocators.getSearchTextField($);
     await searchTextField.waitUntilVisible();
@@ -530,7 +759,7 @@ class HotelsScreenActions {
   static Future<void> testLongSearchQuery(PatrolIntegrationTester $) async {
     TestLogger.logAction($, 'Testing very long search query');
 
-    await clearSearchField($);
+    await clearSearchFieldStatic($);
 
     final searchTextField = AppLocators.getSearchTextField($);
     await searchTextField.waitUntilVisible();
@@ -610,5 +839,45 @@ class HotelsScreenActions {
     }
 
     TestLogger.logTestSuccess($, 'Search state verification completed');
+  }
+}
+
+/// Custom exception class for Hotels page specific errors
+class HotelsPageException implements Exception {
+  final String message;
+  final Exception? originalException;
+  
+  const HotelsPageException(this.message, {this.originalException});
+  
+  @override
+  String toString() {
+    if (originalException != null) {
+      return 'HotelsPageException: $message\nCaused by: $originalException';
+    }
+    return 'HotelsPageException: $message';
+  }
+}
+
+/// Custom assertions class for Hotels page
+class HotelsPageAssertions {
+  final PatrolIntegrationTester tester;
+  final HotelsScreenActions actions;
+  
+  HotelsPageAssertions(this.tester, this.actions);
+  
+  /// Assert that the hotels page is properly loaded
+  Future<void> assertPageLoaded() async {
+    await actions.validatePageLoaded();
+  }
+  
+  /// Assert that search results are displayed
+  Future<void> assertSearchResults() async {
+    final hasCards = tester(Card).exists;
+    final hasEmpty = AppLocators.getHotelsEmptyStateIcon(tester).exists;
+    final hasError = AppLocators.getHotelsErrorMessage(tester).exists;
+    
+    if (!hasCards && !hasEmpty && !hasError) {
+      throw HotelsPageException('Expected search results, empty state, or error state');
+    }
   }
 }

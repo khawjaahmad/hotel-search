@@ -150,7 +150,9 @@ test-reports/
 test-results/
 test_results/
 patrol-*.log
-*.log
+
+# Integration test reports
+integration_test/reports/
 
 # Firebase
 .firebase/

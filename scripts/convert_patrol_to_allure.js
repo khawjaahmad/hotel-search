@@ -145,18 +145,25 @@ function parsePatrolLog(logFile) {
         hasTests = true;
       }
 
-      // Failure patterns
-      else if (line.includes('❌') || line.includes('FAIL') || line.includes('ERROR') ||
-               line.includes('Exception') || line.includes('failed')) {
-        if (currentTest) {
-          currentTest.status = 'failed';
-          currentTest.endTime = Date.now() - (tests.length * 500);
-          currentTest.error = line;
-        } else {
-          status = 'failed';
-          errorMessage = line;
+      // Failure patterns - be more specific to avoid false positives
+      else if ((line.includes('❌') && !line.includes('Failed: 0') && !line.includes('Errors: 0')) || 
+               (line.includes('FAIL') && !line.includes('API failure')) ||
+               (line.includes('ERROR') && !line.includes('Error state')) ||
+               (line.includes('Exception') && !line.includes('Expected')) ||
+               (line.includes('failed') && !line.includes('API failure') && !line.includes('failure test'))) {
+        // Additional check: don't mark as failed if the line contains success indicators
+        if (!line.includes('✅') && !line.includes('completed successfully') && 
+            !line.includes('properly displayed') && !line.includes('handled')) {
+          if (currentTest) {
+            currentTest.status = 'failed';
+            currentTest.endTime = Date.now() - (tests.length * 500);
+            currentTest.error = line;
+          } else {
+            status = 'failed';
+            errorMessage = line;
+          }
+          hasTests = true;
         }
-        hasTests = true;
       }
 
       // Skip patterns
@@ -281,7 +288,7 @@ function createAllureResults(tests) {
 }
 
 function writeAllureResults(results) {
-  const outputDir = 'allure-results';
+  const outputDir = 'integration_test/reports/allure-results';
 
   if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });

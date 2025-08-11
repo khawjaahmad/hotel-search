@@ -7,7 +7,7 @@ const { v4: uuidv4 } = require('uuid');
 // Configuration
 const CONFIG = {
   INPUT_FILE: 'test-results.json',
-  OUTPUT_DIR: 'allure-results',
+  OUTPUT_DIR: 'integration_test/reports/allure-results',
   CATEGORIES_FILE: 'categories.json',
   ENVIRONMENT_FILE: 'environment.properties'
 };

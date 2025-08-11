@@ -54,7 +54,7 @@ function testAllureSetup() {
   }
 
   // Check directories
-  const dirs = ['allure-results', 'allure-report', 'scripts'];
+  const dirs = ['integration_test/reports/allure-results', 'integration_test/reports/allure-report', 'scripts'];
   for (const dir of dirs) {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
@@ -83,7 +83,7 @@ function testAllureSetup() {
       attachments: []
     };
 
-    fs.writeFileSync('allure-results/setup-test-result.json', JSON.stringify(testResult, null, 2));
+    fs.writeFileSync('integration_test/reports/allure-results/setup-test-result.json', JSON.stringify(testResult, null, 2));
     log('✅ Test Allure result created successfully', COLORS.GREEN);
   } catch (error) {
     log(`❌ Failed to create test Allure result: ${error.message}`, COLORS.RED);
@@ -92,7 +92,7 @@ function testAllureSetup() {
 
   // Test Allure report generation
   try {
-    execSync('allure generate allure-results -o allure-report --clean', { stdio: 'inherit' });
+    execSync('allure generate integration_test/reports/allure-results -o integration_test/reports/allure-report --clean', { stdio: 'inherit' });
     log('✅ Allure report generated successfully', COLORS.GREEN);
   } catch (error) {
     log(`❌ Failed to generate Allure report: ${error.message}`, COLORS.RED);

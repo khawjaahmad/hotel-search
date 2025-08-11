@@ -304,7 +304,7 @@ The framework supports multiple CI/CD platforms:
 make coverage
 
 # View coverage report
-open coverage/html/index.html
+open integration_test/reports/coverage/html/index.html
 ```
 
 ### Allure Reports
@@ -313,7 +313,7 @@ open coverage/html/index.html
 make allure-test
 
 # Serve interactive report
-allure serve allure-results
+allure serve integration_test/reports/allure-results
 ```
 
 ### Performance Metrics
