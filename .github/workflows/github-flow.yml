@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 env:
-  FLUTTER_VERSION: "3.24.0"
+  FLUTTER_VERSION: "3.32.0"
 
 jobs:
   build_and_test:
@@ -34,7 +34,7 @@ jobs:
 
       - name: Setup Patrol CLI
         run: |
-          dart pub global activate patrol_cli
+          dart pub global activate patrol_cli 3.10.0
           echo "$HOME/.pub-cache/bin" >> $GITHUB_PATH
 
       - name: Install Dependencies
