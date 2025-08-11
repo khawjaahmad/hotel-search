@@ -40,8 +40,8 @@ dev_dependencies:
   mocktail: ^1.0.1
   json_serializable: ^6.9.0
   slang_build_runner: ^4.4.0
-  patrol: ^3.15.2
-  patrol_cli: ^3.5.0
+  patrol: ^3.18.0
+  patrol_cli: ^3.10.0
   golden_toolkit: ^0.15.0
   mockito: ^5.4.2
   integration_test:
